@@ -53,6 +53,11 @@ INSTALLED_APPS = [
     "partner",
     "registrar",
     "super_admin",
+    "system_audit",
+    "academic_records",
+    "organization_chart",
+
+
     
 ]
 

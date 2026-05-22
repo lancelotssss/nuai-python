@@ -8,10 +8,38 @@
   --color-nu-bg: #f8fafc;
   --color-nu-card: #ffffff;
   --color-nu-muted: #64748b;
+
+  --color-background: #ffffff;
+  --color-foreground: #111827;
+
+  --color-card: #ffffff;
+  --color-card-foreground: #111827;
+
+  --color-muted: #f3f4f6;
+  --color-muted-foreground: #6b7280;
+
+  --color-border: #e5e7eb;
+  --color-input: #e5e7eb;
+  --color-ring: #c7d2fe;
+
+  --color-sidebar: #ffffff;
+  --color-sidebar-foreground: #111827;
+  --color-sidebar-border: #e5e7eb;
+  --color-sidebar-accent: #f3f4f6;
+  --color-sidebar-accent-foreground: #3d398c;
+  --color-sidebar-ring: #c7d2fe;
 }
 
 * {
   box-sizing: border-box;
+}
+
+*,
+::before,
+::after,
+::backdrop,
+::file-selector-button {
+  border-color: #e5e7eb;
 }
 
 html,
@@ -28,6 +56,26 @@ body {
   font-family: "Geist Variable", system-ui, sans-serif;
 }
 
-button {
+button,
+input,
+textarea,
+select {
   font-family: inherit;
+}
+
+.nu-card-hover {
+  @apply select-none rounded-2xl border border-border bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg;
+}
+
+.nu-icon-hover {
+  @apply transition-all duration-300;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
