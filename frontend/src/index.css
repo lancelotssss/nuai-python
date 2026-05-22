@@ -1,0 +1,33 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/geist";
+
+@theme {
+  --color-nu-blue: #3d398c;
+  --color-nu-gold: #f6c445;
+  --color-nu-bg: #f8fafc;
+  --color-nu-card: #ffffff;
+  --color-nu-muted: #64748b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  width: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: #ffffff;
+  font-family: "Geist Variable", system-ui, sans-serif;
+}
+
+button {
+  font-family: inherit;
+}
