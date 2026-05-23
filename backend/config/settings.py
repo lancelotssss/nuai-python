@@ -56,6 +56,8 @@ INSTALLED_APPS = [
     "system_audit",
     "academic_records",
     "organization_chart",
+    "internship_classes",
+
 
 
     

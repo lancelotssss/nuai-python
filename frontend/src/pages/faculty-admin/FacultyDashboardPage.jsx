@@ -1,285 +1,99 @@
-import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
 import {
-  ClipboardList,
-  GraduationCap,
-  UsersRound,
-  CalendarDays,
-  LogOut,
-  FileText,
+  BarChart3,
+  ShieldCheck,
   BriefcaseBusiness,
-  UserCheck,
+  Activity,
 } from "lucide-react";
 
-import PageTitle from "../../components/PageTitle";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-
-const BRAND_BLUE = "#3D398C";
-
-function getStoredAccount() {
-  try {
-    return JSON.parse(localStorage.getItem("nuai_account") || "null");
-  } catch {
-    return null;
-  }
-}
-
-function StatCard({ icon: Icon, label, value, description, accent = BRAND_BLUE }) {
-  return (
-    <Card className="border-border/60 shadow-sm">
-      <CardContent className="px-5 py-4">
-        <div className="flex items-center gap-4">
-          <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
-            style={{ backgroundColor: `${accent}1A` }}
-          >
-            <Icon className="h-5 w-5" style={{ color: accent }} />
-          </div>
-
-          <div className="space-y-0.5">
-            <p
-              className="text-xl font-bold leading-tight tracking-tight"
-              style={{ color: accent }}
-            >
-              {value}
-            </p>
-
-            <p className="text-xs font-semibold text-foreground/80">{label}</p>
-
-            {description ? (
-              <p className="text-[10px] text-muted-foreground">
-                {description}
-              </p>
-            ) : null}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function QuickActionCard({ icon: Icon, title, description, onClick }) {
-  return (
-    <Card
-      className="group cursor-pointer border-border/50 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#3D398C]/20 hover:shadow-md"
-      onClick={onClick}
-    >
-      <CardContent className="px-4 py-3">
-        <div className="flex items-center gap-3">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#3D398C]/5 text-[#3D398C] transition-colors group-hover:bg-[#3D398C]/10">
-            <Icon size={18} />
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-semibold text-foreground">
-              {title}
-            </p>
-
-            <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-              {description}
-            </p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function FacultyDashboardPage() {
-  const navigate = useNavigate();
-  const account = useMemo(() => getStoredAccount(), []);
-
-  const userEmail = account?.email || "—";
-
-  function handleLogout() {
-    localStorage.removeItem("nuai_account");
-    navigate("/login", { replace: true });
-  }
-
-  function getGreeting() {
-    const hour = new Date().getHours();
-
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-
-    return "Good evening";
-  }
-
-  if (!account || account.role !== "faculty") {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Card className="max-w-sm border-border/60">
-          <CardContent className="pt-5">
-            <div className="space-y-4 text-center">
-              <p className="text-sm font-semibold text-nu-blue">
-                Unauthorized Access
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Please login using an Internship Adviser account.
-              </p>
-              <Button
-                type="button"
-                onClick={() => navigate("/login", { replace: true })}
-                className="bg-nu-blue text-white hover:bg-nu-blue/90"
-              >
-                Go to Login
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const stats = [
+    {
+      title: "Internship Dashboard",
+      value: "Coming Soon",
+      desc: "This section will be used for internship analytics and summaries.",
+      icon: BarChart3,
+    },
+    {
+      title: "Internship Records",
+      value: "Managed Here",
+      desc: "Track internship-related information and student placement records.",
+      icon: BriefcaseBusiness,
+    },
+    {
+      title: "Security Monitoring",
+      value: "Audit Ready",
+      desc: "Review activities through the system audit logs.",
+      icon: ShieldCheck,
+    },
+    {
+      title: "System Health",
+      value: "Stable",
+      desc: "Internship Adviser workspace is active and accessible.",
+      icon: Activity,
+    },
+  ];
 
   return (
-    <>
-      <PageTitle title="Internship Adviser | NUAI" />
+    <div className="space-y-6">
+      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <div className="bg-gradient-to-r from-nu-blue via-[#183B8C] to-[#234AA8] px-6 py-8 text-white sm:px-8">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/70">
+            Dashboard
+          </p>
+          <h1 className="mt-2 text-2xl font-extrabold sm:text-3xl">
+            Internship Adviser Analytics
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/80">
+            This page is reserved for future internship analytics, placement
+            summaries, and adviser overview metrics.
+          </p>
+        </div>
 
-      <main className="min-h-screen bg-slate-50">
-        <header className="border-b border-border bg-white">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-nu-gold">
-                NUAI
-              </p>
+        <div className="grid gap-4 px-6 py-6 sm:grid-cols-2 xl:grid-cols-4 sm:px-8">
+          {stats.map((item) => {
+            const Icon = item.icon;
 
-              <h1 className="mt-1 text-2xl font-bold text-nu-blue">
-                Internship Adviser Dashboard
-              </h1>
-
-              <p className="mt-1 text-sm text-muted-foreground">
-                Monitor interns, internship records, and adviser-related tasks.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Badge
-                variant="outline"
-                className="border-[#3D398C]/20 text-[#3D398C]"
+            return (
+              <div
+                key={item.title}
+                className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
               >
-                Faculty
-              </Badge>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      {item.title}
+                    </p>
+                    <p className="mt-2 text-xl font-extrabold text-nu-blue">
+                      {item.value}
+                    </p>
+                  </div>
 
-              <Button
-                type="button"
-                onClick={handleLogout}
-                variant="outline"
-                className="border-border text-red-600 hover:bg-red-50 hover:text-red-700"
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        </header>
-
-        <section className="mx-auto max-w-7xl space-y-6 px-6 py-8">
-          <Card className="border-border/60 shadow-sm overflow-hidden border-l-[#3D398C]">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <CardTitle className="text-lg font-bold text-foreground">
-                    {getGreeting()},{" "}
-                    <span className="text-[#3D398C]">Internship Adviser!</span>{" "}
-                    <span className="text-xs font-light text-[#b1b1b1]">
-                      ({userEmail})
-                    </span>
-                  </CardTitle>
-
-                  <CardDescription className="text-sm">
-                    Welcome to your Internship Adviser workspace. Review assigned
-                    interns, monitor internship progress, and manage adviser
-                    activities.
-                  </CardDescription>
+                  <div className="grid h-11 w-11 place-items-center rounded-2xl bg-nu-blue/10 text-nu-blue">
+                    <Icon className="h-5 w-5" />
+                  </div>
                 </div>
 
-                <Badge
-                  variant="outline"
-                  className="shrink-0 border-[#F5DA3E]/50 bg-[#F5DA3E]/10 text-[#3D398C] font-semibold text-[11px]"
-                >
-                  Internship Adviser
-                </Badge>
+                <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                  {item.desc}
+                </p>
               </div>
-            </CardHeader>
-          </Card>
+            );
+          })}
+        </div>
+      </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard
-              icon={UsersRound}
-              label="Assigned Interns"
-              value="0"
-              description="Intern records connected soon"
-            />
-
-            <StatCard
-              icon={ClipboardList}
-              label="Requirements"
-              value="Pending"
-              accent="#059669"
-              description="Requirement tracking module"
-            />
-
-            <StatCard
-              icon={BriefcaseBusiness}
-              label="Internship Posts"
-              value="Ready"
-              accent="#D97706"
-              description="Partner internship opportunities"
-            />
-
-            <StatCard
-              icon={UserCheck}
-              label="Adviser Status"
-              value="Active"
-              accent="#7C3AED"
-              description="Account verified by role"
-            />
-          </div>
-
-          <div>
-            <div className="mb-3">
-              <h2 className="text-sm font-semibold text-foreground">
-                Quick Actions
-              </h2>
-
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Jump to frequently used adviser sections
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <QuickActionCard
-                icon={GraduationCap}
-                title="Manage Interns"
-                description="View and monitor assigned intern records"
-                onClick={() => {}}
-              />
-
-              <QuickActionCard
-                icon={FileText}
-                title="Internship Requirements"
-                description="Review submitted internship documents and status"
-                onClick={() => {}}
-              />
-
-              <QuickActionCard
-                icon={CalendarDays}
-                title="Schedules"
-                description="Track internship schedules and adviser activities"
-                onClick={() => {}}
-              />
-            </div>
-          </div>
-        </section>
-      </main>
-    </>
+      <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
+        <p className="text-sm font-bold uppercase tracking-[0.18em] text-slate-400">
+          Placeholder
+        </p>
+        <h2 className="mt-2 text-2xl font-extrabold text-slate-900">
+          Internship Adviser Content Goes Here
+        </h2>
+        <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-slate-600">
+          Add internship charts, student deployment summaries, company partner
+          counts, evaluation status, or adviser-based statistics here later.
+        </p>
+      </div>
+    </div>
   );
 }

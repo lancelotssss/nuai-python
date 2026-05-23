@@ -17,12 +17,22 @@ import AdminCreateAlumniOfficer from "./pages/super-admin/AdminCreateAlumniOffic
 import AdminCreateAILPO from "./pages/super-admin/AdminCreateAILPO";
 import AdminCreateRegistrar from "./pages/super-admin/AdminCreateRegistrar";
 import AdminCreateFaculty from "./pages/super-admin/AdminCreateFaculty";
+
 import AdminManageAcademicRecordsPage from "./pages/super-admin/academic-records/AdminManageAcademicRecordsPage";
 import AcademicProgramTableView from "./pages/super-admin/academic-records/AcademicProgramTableView";
 import AdminOrganizationalChart from "./pages/super-admin/organizational-chart/AdminOrganizationalChart";
 import AdminProfile from "./pages/super-admin/profile/AdminProfile";
 
+import FacultyLayout from "./pages/faculty-admin/layout/FacultyLayout";
 import FacultyDashboardPage from "./pages/faculty-admin/FacultyDashboardPage";
+import FacultyProfile from "./pages/faculty-admin/profile/FacultyProfile";
+import FacultySystemAudit from "./pages/faculty-admin/system-audit/FacultySystemAudit";
+
+import ClassManagement from "./pages/faculty-admin/internship-management/ClassManagement";
+import AddClass from "./pages/faculty-admin/internship-management/AddClass";
+import IndividualClassManagement from "./pages/faculty-admin/internship-management/IndividualClassManagement";
+import ManageInterns from "./pages/faculty-admin/program-course-students/ManageInterns";
+
 import AlumniDashboardPage from "./alumni-intern/AlumniDashboardPage";
 
 function DashboardPlaceholder({ title }) {
@@ -106,17 +116,39 @@ export default function App() {
             element={<AdminCreateFaculty />}
           />
 
-          <Route path="academic-records" element={<AdminManageAcademicRecordsPage />} />
-          <Route path="academic-records/:schoolProgramId" element={<AcademicProgramTableView />} />
+          <Route
+            path="academic-records"
+            element={<AdminManageAcademicRecordsPage />}
+          />
 
-          <Route path="organization-chart" element={<AdminOrganizationalChart />} />
+          <Route
+            path="academic-records/:schoolProgramId"
+            element={<AcademicProgramTableView />}
+          />
+
+          <Route
+            path="organization-chart"
+            element={<AdminOrganizationalChart />}
+          />
 
           <Route path="profile" element={<AdminProfile />} />
-
         </Route>
 
         {/* Faculty / Internship Adviser */}
-        <Route path="/faculty" element={<FacultyDashboardPage />} />
+        <Route path="/faculty" element={<FacultyLayout />}>
+          <Route index element={<FacultyDashboardPage />} />
+
+          <Route path="internships" element={<ClassManagement />} />
+          <Route path="internships/add-class" element={<AddClass />} />
+          <Route path="intern-list" element={<ManageInterns />} />
+          <Route
+            path="internships/:classId"
+            element={<IndividualClassManagement />}
+          />
+
+          <Route path="profile" element={<FacultyProfile />} />
+          <Route path="system-audit" element={<FacultySystemAudit />} />
+        </Route>
 
         {/* Alumni + Intern shared dashboard */}
         <Route path="/alumni" element={<AlumniDashboardPage />} />
