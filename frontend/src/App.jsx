@@ -33,7 +33,15 @@ import AddClass from "./pages/faculty-admin/internship-management/AddClass";
 import IndividualClassManagement from "./pages/faculty-admin/internship-management/IndividualClassManagement";
 import ManageInterns from "./pages/faculty-admin/program-course-students/ManageInterns";
 
-import AlumniDashboardPage from "./alumni-intern/AlumniDashboardPage";
+import AlumniDashboardPage from "./pages/alumni-intern/AlumniDashboardPage";
+
+import OfficerLayout from "./pages/alumni-officer/layout/OfficerLayout";
+import OfficerDashboardPage from "./pages/alumni-officer/dashboard/OfficerDashboardPage";
+import OfficerProfile from "./pages/alumni-officer/profile/OfficerProfile";
+import OfficerSystemAudit from "./pages/alumni-officer/system-audit/OfficerSystemAudit";
+import OfficerManageUsers from "./pages/alumni-officer/components/OfficerManageUsers";
+import OfficerViewProfile from "./pages/alumni-officer/components/OfficerViewProfile";
+import OfficerEmploymentAnalytics from "./pages/alumni-officer/components/OfficerEmploymentAnalytics";
 
 function DashboardPlaceholder({ title }) {
   const account = JSON.parse(localStorage.getItem("nuai_account") || "null");
@@ -150,16 +158,25 @@ export default function App() {
           <Route path="system-audit" element={<FacultySystemAudit />} />
         </Route>
 
+        {/* Alumni Officer */}
+        <Route path="/alumni-officer" element={<OfficerLayout />}>
+          <Route index element={<OfficerDashboardPage />} />
+          <Route path="profile" element={<OfficerProfile />} />
+          <Route path="system-audit" element={<OfficerSystemAudit />} />
+
+          <Route path="alumni/manage" element={<OfficerManageUsers />} />
+          <Route
+            path="alumni/manage/analytics"
+            element={<OfficerEmploymentAnalytics />}
+          />
+          <Route path="alumni/manage/:userId" element={<OfficerViewProfile />} />
+        </Route>
+
         {/* Alumni + Intern shared dashboard */}
         <Route path="/alumni" element={<AlumniDashboardPage />} />
         <Route path="/intern" element={<AlumniDashboardPage />} />
 
         {/* Other role placeholders for now */}
-        <Route
-          path="/alumni-officer"
-          element={<DashboardPlaceholder title="Alumni Officer Dashboard" />}
-        />
-
         <Route
           path="/ailpo"
           element={<DashboardPlaceholder title="AILPO Dashboard" />}

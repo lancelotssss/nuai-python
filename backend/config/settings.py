@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "academic_records",
     "organization_chart",
     "internship_classes",
+    "pre_registered_alumni",
 
 
 

@@ -679,8 +679,19 @@ export default function ManageInterns() {
     });
 
     if (!uploadableRows.length) {
+      if (duplicateRows.length > 0 && invalidRows.length === 0) {
+        setBulkReviewOpen(false);
+        setBulkRows([]);
+        setBulkFileName("");
+
+        toast.success("Bulk upload finished", {
+          description: `0 uploaded, ${duplicateRows.length} duplicate${duplicateRows.length === 1 ? "" : "s"} skipped, 0 failed rows.`,
+        });
+        return;
+      }
+
       toast.error("No rows to upload", {
-        description: "Please fix invalid rows or remove duplicate rows first.",
+        description: "Please fix invalid rows before continuing.",
       });
       return;
     }
@@ -708,7 +719,7 @@ export default function ManageInterns() {
       setBulkFileName("");
 
       toast.success("Bulk upload finished", {
-        description: `${uploadedCount} uploaded, ${duplicateRows.length} duplicates, ${failedCount} failed rows.`,
+        description: `${uploadedCount} uploaded, ${duplicateRows.length} duplicate${duplicateRows.length === 1 ? "" : "s"} skipped, ${failedCount} failed row${failedCount === 1 ? "" : "s"}.`,
       });
 
       await loadData({ background: false });

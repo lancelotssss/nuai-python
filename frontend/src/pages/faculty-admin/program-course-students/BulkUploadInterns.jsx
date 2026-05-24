@@ -371,6 +371,12 @@ export default function BulkUploadInterns({
                 <span className="font-medium text-amber-700">{duplicateCount}</span> duplicates
                 <span className="mx-2 text-muted-foreground/40">•</span>
                 <span className="font-medium text-red-600">{invalidCount}</span> invalid
+                {duplicateCount > 0 && invalidCount === 0 ? (
+                  <>
+                    <span className="mx-2 text-muted-foreground/40">•</span>
+                    <span className="font-medium text-amber-700">Duplicates will be skipped</span>
+                  </>
+                ) : null}
               </p>
 
               <div className="flex justify-end gap-2">
@@ -386,7 +392,7 @@ export default function BulkUploadInterns({
                 <Button
                   type="button"
                   size="sm"
-                  disabled={bulkSaving || validCount === 0}
+                  disabled={bulkSaving || rowsWithStatus.length === 0 || invalidCount > 0}
                   onClick={() => onRequestContinue?.(rowsWithStatus)}
                   style={{ backgroundColor: BB }}
                   className="gap-1.5 text-white hover:opacity-90"
