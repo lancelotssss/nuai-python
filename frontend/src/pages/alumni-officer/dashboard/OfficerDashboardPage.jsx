@@ -7,8 +7,10 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Label as RechartsLabel,
+  LabelList,
   Pie,
-  PieChart as RechartsPieChart,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -16,37 +18,36 @@ import {
 } from "recharts";
 
 import {
-  ArrowRight,
+  ArrowUpRight,
   CalendarDays,
-  ClipboardList,
-  FileText,
-  Gift,
-  Megaphone,
-  PieChart as PieChartIcon,
-  Tag,
-  Users,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 
 const BRAND_BLUE = "#3D398C";
+const NU_YELLOW = "#F5DA3E";
+
+const STATUS_COLORS = {
+  registered: "#3D398C",
+  transitioning: "#D97706",
+  preRegistered: "#94A3B8",
+};
 
 const DASHBOARD_COLORS = {
   alumni: {
@@ -99,17 +100,25 @@ const SURVEY_ENGAGEMENT_INITIAL = {
   responseCount: 0,
 };
 
+const SURVEY_OVERVIEW_INITIAL = {
+  activeSurveyCount: 0,
+  surveysWithResponses: 0,
+  surveysWithoutResponses: 0,
+  totalResponses: 0,
+  averageResponses: 0,
+  topSurveyTitle: "",
+  topSurveyResponses: 0,
+};
+
 
 
 const CATEGORY_CHART_COLORS = [
   "#3D398C",
-  "#0EA5E9",
-  "#10B981",
-  "#F59E0B",
-  "#EF4444",
-  "#7C3AED",
-  "#EC4899",
-  "#14B8A6",
+  "#5B57A8",
+  "#7A77C0",
+  "#9996D4",
+  "#B8B6E2",
+  "#CBD5E1",
 ];
 
 const MONTH_OPTIONS = [
@@ -398,293 +407,447 @@ function buildCalendarDays(year, month) {
   });
 }
 
-function DashboardMetricCard({
-  icon: Icon,
-  value,
-  label,
-  color = DASHBOARD_COLORS.posts,
-  loading = false,
-  onViewDetails,
-}) {
+
+/* ───────────────── shadcn chart/calendar compatibility ───────────────── */
+
+function ChartContainer({ className = "", children }) {
   return (
-    <Card className="group overflow-hidden border-border/60 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#3D398C]/20 hover:shadow-md">
-      <CardContent className="p-0">
-        <div className="flex items-start gap-3 px-4 py-4">
-          <div
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
-            style={{
-              backgroundColor: color.bg,
-              color: color.text,
-            }}
-          >
-            <Icon size={18} />
-          </div>
-
-          <div className="min-w-0 flex-1">
-            {loading ? (
-              <div className="h-6 w-16 animate-pulse rounded-md bg-muted" />
-            ) : (
-              <p
-                className="text-xl font-bold leading-none"
-                style={{ color: color.text }}
-              >
-                {formatCount(value)}
-              </p>
-            )}
-
-            <p
-              className="mt-1 text-xs font-medium leading-5"
-              style={{ color: color.text }}
-            >
-              {label}
-            </p>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={onViewDetails}
-          className="flex w-full cursor-pointer items-center justify-between border-t border-border/60 px-4 py-3 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40"
-          style={{ "--metric-accent": color.text }}
-        >
-          <span className="transition-colors group-hover:text-[var(--metric-accent)]">
-            View details
-          </span>
-          <ArrowRight
-            size={14}
-            className="transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--metric-accent)]"
-          />
-        </button>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ChartTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null;
-
-  const item = payload[0];
-  const name = item?.name || item?.payload?.name || item?.payload?.status || "Item";
-  const value = item?.value || item?.payload?.value || item?.payload?.count || 0;
-
-  return (
-    <div className="rounded-lg border border-border bg-white px-3 py-2 text-xs shadow-md">
-      <p className="font-semibold text-foreground">{name}</p>
-      <p className="mt-0.5 text-muted-foreground">{formatCount(value)} records</p>
-    </div>
-  );
-}
-
-function RechartsDonutChart({ data = [], loading = false, height = 170 }) {
-  const total = data.reduce((sum, item) => sum + Number(item.value || 0), 0);
-
-  if (loading) {
-    return <div className="h-[170px] w-full animate-pulse rounded-xl bg-muted" />;
-  }
-
-  if (!total) {
-    return (
-      <div className="grid h-[170px] place-items-center rounded-xl border border-dashed border-border bg-muted/20 text-xs font-medium text-muted-foreground">
-        No chart data
-      </div>
-    );
-  }
-
-  return (
-    <div className="h-[170px] w-full">
-      <ResponsiveContainer width="100%" height={height}>
-        <RechartsPieChart>
-          <Tooltip content={<ChartTooltip />} />
-          <Pie
-            data={data}
-            dataKey="value"
-            nameKey="name"
-            innerRadius={48}
-            outerRadius={72}
-            paddingAngle={2}
-            stroke="none"
-          >
-            {data.map((entry, index) => (
-              <Cell key={`${entry.name}-${index}`} fill={entry.color} />
-            ))}
-          </Pie>
-        </RechartsPieChart>
+    <div className={className}>
+      <ResponsiveContainer width="100%" height="100%">
+        {children}
       </ResponsiveContainer>
     </div>
   );
 }
 
-function SurveyEngagementChart({ answeredCount, notAnsweredCount, loading }) {
-  const total = answeredCount + notAnsweredCount;
-  const answeredPercent = total > 0 ? (answeredCount / total) * 100 : 0;
+function ChartTooltipContent({ active, payload, label, formatter, labelFormatter, hideLabel }) {
+  if (!active || !payload?.length) return null;
 
-  const data = [
-    {
-      name: "Answered",
-      value: answeredCount,
-      color: BRAND_BLUE,
-    },
-    {
-      name: "Not answered",
-      value: notAnsweredCount,
-      color: "#E5E7EB",
-    },
-  ];
+  const displayLabel = labelFormatter ? labelFormatter(label, payload) : label;
 
   return (
-    <div className="relative w-full max-w-[190px]">
-      <RechartsDonutChart data={data} loading={loading} height={170} />
-      {!loading ? (
-        <div className="pointer-events-none absolute inset-0 grid place-items-center">
-          <div className="text-center">
-            <p className="text-lg font-bold text-foreground">
-              {formatPercent(answeredPercent)}
-            </p>
-            <p className="text-[10px] font-medium text-muted-foreground">answered</p>
-          </div>
-        </div>
+    <div className="min-w-[140px] rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-md">
+      {!hideLabel && displayLabel ? (
+        <p className="mb-1 font-medium text-gray-700">{displayLabel}</p>
       ) : null}
+      <div className="space-y-1">
+        {payload.map((item, index) => {
+          const formatted = formatter
+            ? formatter(item.value, item.name, item, index, item.payload)
+            : item.value;
+
+          return (
+            <div key={`${item.name || "item"}-${index}`} className="flex items-center justify-between gap-3">
+              <span className="text-gray-500">{item.name || item.dataKey}</span>
+              {typeof formatted === "string" || typeof formatted === "number" ? (
+                <span className="font-semibold tabular-nums text-gray-900">{formatted}</span>
+              ) : (
+                formatted
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-function SurveyEngagementCard({
-  surveys,
-  selectedSurveyId,
-  setSelectedSurveyId,
-  engagement,
-  loadingSurveys,
-  loadingEngagement,
-  error,
-}) {
-  const selectedSurvey = surveys.find((survey) => survey.id === selectedSurveyId);
+const ChartTooltip = Tooltip;
 
-  const answeredCount = Number(engagement.answeredCount || 0);
-  const notAnsweredCount = Number(engagement.notAnsweredCount || 0);
-  const totalEngagement = answeredCount + notAnsweredCount;
+function Calendar({ selected, month, onMonthChange, modifiers = {} }) {
+  const visibleMonth = month || new Date();
+  const year = visibleMonth.getFullYear();
+  const monthIndex = visibleMonth.getMonth();
+  const days = buildCalendarDays(year, monthIndex);
+  const eventDates = modifiers?.hasEvent || [];
+  const weeks = Array.from({ length: 6 }, (_, weekIndex) =>
+    days.slice(weekIndex * 7, weekIndex * 7 + 7),
+  );
 
-  const labelItems = [
-    {
-      label: "Answered",
-      value: answeredCount,
-      color: BRAND_BLUE,
-      helper: "Alumni who submitted a response",
-    },
-    {
-      label: "Not answered",
-      value: notAnsweredCount,
-      color: "#E5E7EB",
-      helper: "Eligible alumni without response",
-    },
-  ];
+  function goToMonth(offset) {
+    const next = new Date(year, monthIndex + offset, 1);
+    onMonthChange?.(next);
+  }
 
   return (
-    <Card className="h-full overflow-hidden border-border/60 bg-white shadow-sm">
-      <CardHeader className="border-b border-border/60 pb-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
-            style={{ backgroundColor: DASHBOARD_COLORS.surveys.bg, color: DASHBOARD_COLORS.surveys.text }}>
-            <PieChartIcon size={18} />
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <CardTitle className="text-base font-bold text-foreground">
-              Survey Engagement
-            </CardTitle>
-
-            <CardDescription className="mt-1 text-xs leading-5">
-              Percentage of alumni who answered the selected survey.
-            </CardDescription>
-
-            <div className="mt-3 w-full max-w-[360px]">
-              <Select
-                value={selectedSurveyId || undefined}
-                onValueChange={setSelectedSurveyId}
-                disabled={loadingSurveys || surveys.length === 0}
-              >
-                <SelectTrigger className="h-9 w-full rounded-xl border-border bg-white text-xs font-medium">
-                  <SelectValue
-                    placeholder={
-                      loadingSurveys ? "Loading surveys..." : "Select survey"
-                    }
-                  />
-                </SelectTrigger>
-
-                <SelectContent>
-                  {surveys.map((survey) => (
-                    <SelectItem key={survey.id} value={survey.id}>
-                      {getSurveyTitle(survey)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+    <div className="w-full p-0">
+      <div className="relative flex w-full flex-col gap-3">
+        <div className="absolute inset-x-0 top-0 flex w-full items-center justify-between px-1">
+          <button
+            type="button"
+            onClick={() => goToMonth(-1)}
+            className="grid h-6 w-6 cursor-pointer place-items-center rounded-md p-0 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+            aria-label="Previous month"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => goToMonth(1)}
+            className="grid h-6 w-6 cursor-pointer place-items-center rounded-md p-0 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+            aria-label="Next month"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
         </div>
-      </CardHeader>
 
-      <CardContent className="p-5">
-        {error ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-            {error}
-          </div>
-        ) : surveys.length === 0 && !loadingSurveys ? (
-          <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-8 text-center">
-            <p className="text-sm font-semibold text-foreground">
-              No available surveys found.
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Active or published surveys will appear here once available.
-            </p>
-          </div>
-        ) : (
-          <div className="grid items-center gap-5 md:grid-cols-[minmax(0,1fr)_190px]">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-foreground">
-                {selectedSurvey ? getSurveyTitle(selectedSurvey) : "No survey selected"}
-              </p>
+        <div className="flex h-6 w-full items-center justify-center px-8 text-xs font-semibold text-gray-900">
+          {visibleMonth.toLocaleDateString([], { month: "long", year: "numeric" })}
+        </div>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 md:grid-cols-1">
-                {labelItems.map((item) => (
-                  <div
-                    key={item.label}
-                    className="rounded-xl border border-border/70 bg-muted/20 px-3 py-3"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span
-                          className="h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: item.color }}
-                        />
-                        <span className="truncate text-sm font-medium text-muted-foreground">
-                          {item.label}
-                        </span>
-                      </div>
-                      <span className="text-sm font-bold text-foreground">
-                        {loadingSurveys || loadingEngagement ? "..." : formatCount(item.value)}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-[11px] font-medium text-muted-foreground">
-                      {loadingSurveys || loadingEngagement
-                        ? "Loading engagement data..."
-                        : `${formatPercent(totalEngagement ? (item.value / totalEngagement) * 100 : 0)} of total · ${item.helper}`}
-                    </p>
-                  </div>
-                ))}
+        <div className="w-full border-collapse">
+          <div className="flex w-full">
+            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
+              <div key={day} className="flex-1 pb-1 text-center text-[10px] font-medium text-gray-400">
+                {day}
               </div>
-            </div>
-
-            <SurveyEngagementChart
-              answeredCount={answeredCount}
-              notAnsweredCount={notAnsweredCount}
-              loading={loadingSurveys || loadingEngagement}
-            />
+            ))}
           </div>
+
+          {weeks.map((week, index) => (
+            <div key={index} className="flex w-full">
+              {week.map((date) => {
+                const outside = date.getMonth() !== monthIndex;
+                const selectedDate = selected && isSameDate(date, selected);
+                const hasEvent = eventDates.some((eventDate) => isSameDate(date, eventDate));
+
+                return (
+                  <div key={date.toISOString()} className="relative flex-1 p-0 text-center">
+                    <div
+                      className={`relative mx-auto grid h-8 w-8 min-w-8 place-items-center rounded-md border-0 p-0 text-[11px] font-medium ${
+                        selectedDate
+                          ? "bg-[#3D398C] text-white"
+                          : outside
+                            ? "text-gray-300"
+                            : "text-gray-700"
+                      }`}
+                    >
+                      {date.getDate()}
+                      {hasEvent ? (
+                        <span className="absolute bottom-0.5 left-1/2 z-20 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-[#F5DA3E]" />
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function formatShortDate(value) {
+  const date = parseDateSafe(value);
+  if (!date) return "-";
+  return date.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function formatTodayLong() {
+  return new Date().toLocaleDateString([], {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/* ───────────────── Page Header ───────────────── */
+
+function DashboardHeader() {
+  return (
+    <div className="flex flex-col gap-1 border-b border-gray-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-gray-900">
+          Dashboard
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Overview of alumni activity, engagement, and content.
+        </p>
+      </div>
+      <div className="flex items-center gap-2 text-xs font-medium text-gray-500">
+        <CalendarDays size={14} className="text-gray-400" />
+        <span>{formatTodayLong()}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ───────────────── Metric Cards ───────────────── */
+
+function MetricCard({ label, value, loading, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group relative w-full cursor-pointer rounded-lg border border-gray-200 bg-white p-4 text-left transition-colors hover:border-gray-300 hover:bg-gray-50/50"
+    >
+      <p className="text-xs font-medium text-gray-500">{label}</p>
+      <div className="mt-2 flex items-end justify-between">
+        {loading ? (
+          <div className="h-7 w-16 animate-pulse rounded bg-gray-100" />
+        ) : (
+          <p className="text-2xl font-semibold tracking-tight text-gray-900 tabular-nums">
+            {formatCount(value)}
+          </p>
         )}
-      </CardContent>
+        <ArrowUpRight
+          size={14}
+          className="text-gray-300 transition-colors group-hover:text-[#3D398C]"
+        />
+      </div>
+    </button>
+  );
+}
+
+/* ───────────────── Section Card Shell (thin border, no shadow) ───────────────── */
+
+function SectionCard({ title, subtitle, action, children, className = "", bodyClassName = "p-4" }) {
+  return (
+    <Card
+      className={`overflow-hidden rounded-lg border border-gray-200 bg-white py-0 shadow-none ring-0 ${className}`}
+    >
+      {(title || action) && (
+        <div className="flex items-start justify-between gap-3 border-b border-gray-200 bg-[#F1F3F8] px-4 py-3">
+          <div className="min-w-0">
+            {title ? (
+              <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+            ) : null}
+            {subtitle ? (
+              <p className="mt-0.5 text-xs text-gray-500">{subtitle}</p>
+            ) : null}
+          </div>
+          {action ? <div className="shrink-0">{action}</div> : null}
+        </div>
+      )}
+      <CardContent className={bodyClassName}>{children}</CardContent>
     </Card>
   );
 }
+
+function ViewAllButton({ onClick, label = "View all" }) {
+  if (!onClick) return null;
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={onClick}
+      className="h-7 cursor-pointer px-2 text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+    >
+      {label}
+      <ArrowUpRight size={12} className="ml-1" />
+    </Button>
+  );
+}
+
+/* ───────────────── Donut + Legend (shadcn charts) ───────────────── */
+
+function MiniDonut({ data = [], loading = false, centerLabel, centerValue }) {
+  const total = data.reduce((sum, item) => sum + Number(item.value || 0), 0);
+  const displayValue = centerValue ?? formatCount(total);
+
+  if (loading) {
+    return <div className="h-[124px] w-full animate-pulse rounded-md bg-gray-100" />;
+  }
+
+  if (!total) {
+    return (
+      <div className="grid h-[124px] place-items-center rounded-md border border-dashed border-gray-200 text-xs text-gray-400">
+        No data
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <ChartContainer
+        className="mx-auto h-[124px] w-[150px]"
+      >
+        <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+          <ChartTooltip
+            cursor={false}
+            content={
+              <ChartTooltipContent
+                hideLabel
+                formatter={(value, name) => (
+                  <div className="flex w-full items-center justify-between gap-3">
+                    <span className="text-gray-600">{name}</span>
+                    <span className="font-semibold tabular-nums text-gray-900">
+                      {formatCount(value)}
+                    </span>
+                  </div>
+                )}
+              />
+            }
+          />
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            innerRadius={30}
+            outerRadius={46}
+            paddingAngle={3}
+            strokeWidth={4}
+          >
+            {data.map((entry, index) => (
+              <Cell key={`${entry.name}-${index}`} fill={entry.color} />
+            ))}
+            <RechartsLabel
+              content={({ viewBox }) => {
+                if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                  return (
+                    <text
+                      x={viewBox.cx}
+                      y={viewBox.cy}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                    >
+                      <tspan
+                        x={viewBox.cx}
+                        y={viewBox.cy}
+                        className="fill-gray-900 text-base font-semibold"
+                      >
+                        {displayValue}
+                      </tspan>
+                      {centerLabel ? (
+                        <tspan
+                          x={viewBox.cx}
+                          y={(viewBox.cy || 0) + 15}
+                          className="fill-gray-500 text-[9px] font-medium"
+                        >
+                          {centerLabel}
+                        </tspan>
+                      ) : null}
+                    </text>
+                  );
+                }
+
+                return null;
+              }}
+            />
+          </Pie>
+        </PieChart>
+      </ChartContainer>
+    </div>
+  );
+}
+
+function LegendRow({ items = [], className = "" }) {
+  return (
+    <div className={`space-y-1.5 ${className}`}>
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="grid grid-cols-[10px_minmax(0,1fr)_auto] items-center gap-2 text-[11px]"
+        >
+          <span
+            className="h-2.5 w-2.5 rounded-full"
+            style={{ backgroundColor: item.color }}
+          />
+          <span className="truncate text-gray-600">{item.label}</span>
+          <span className="font-semibold tabular-nums text-gray-900">
+            {formatCount(item.value)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ───────────────── Survey Engagement ───────────────── */
+
+function SurveyEngagementCard({
+  surveys,
+  overview = SURVEY_OVERVIEW_INITIAL,
+  loadingSurveys,
+  loadingOverview,
+  error,
+}) {
+  const activeSurveyCount = Number(overview.activeSurveyCount || surveys.length || 0);
+  const withResponses = Number(overview.surveysWithResponses || 0);
+  const withoutResponses = Number(overview.surveysWithoutResponses || 0);
+  const totalResponses = Number(overview.totalResponses || 0);
+  const averageResponses = Number(overview.averageResponses || 0);
+
+  const data = [
+    { name: "With responses", value: withResponses, color: BRAND_BLUE },
+    { name: "No responses", value: withoutResponses, color: "#D97706" },
+  ];
+
+  return (
+    <SectionCard
+      title="Survey Engagement"
+      subtitle="Response coverage across active surveys"
+      className="h-full"
+      bodyClassName="flex flex-1 flex-col p-4"
+    >
+      {error ? (
+        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          {error}
+        </p>
+      ) : activeSurveyCount === 0 && !loadingSurveys ? (
+        <div className="grid h-[124px] place-items-center rounded-md border border-dashed border-gray-200 text-xs text-gray-400">
+          No surveys available
+        </div>
+      ) : (
+        <div className="flex flex-1 flex-col gap-3">
+          <MiniDonut
+            data={data}
+            loading={loadingSurveys || loadingOverview}
+            centerLabel="surveys"
+            centerValue={formatCount(activeSurveyCount)}
+          />
+          <div className="grid grid-cols-2 gap-3 border-t border-gray-100 pt-3">
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500">
+                Responses
+              </p>
+              <p className="text-sm font-semibold tabular-nums text-gray-900">
+                {formatCount(totalResponses)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500">
+                Avg / Survey
+              </p>
+              <p className="text-sm font-semibold tabular-nums text-gray-900">
+                {formatCount(averageResponses)}
+              </p>
+            </div>
+          </div>
+          {overview.topSurveyTitle ? (
+            <p
+              className="truncate text-[11px] text-gray-500"
+              title={overview.topSurveyTitle}
+            >
+              Top survey:{" "}
+              <span className="font-medium text-gray-700">
+                {overview.topSurveyTitle}
+              </span>{" "}
+              ({formatCount(overview.topSurveyResponses)} responses)
+            </p>
+          ) : null}
+          <div className="mt-auto border-t border-gray-100 pt-3">
+            <LegendRow
+              items={data.map((d) => ({
+                label: d.name,
+                value: d.value,
+                color: d.color,
+              }))}
+            />
+          </div>
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+/* ───────────────── Monthly Posting Activity (shadcn chart) ───────────────── */
 
 function MonthlyPostingActivityCard({
   data = [],
@@ -696,13 +859,12 @@ function MonthlyPostingActivityCard({
   yearOptions = [],
 }) {
   const selectedMeta =
-    POSTING_ACTIVITY_TYPES.find((type) => type.value === selectedType) ||
+    POSTING_ACTIVITY_TYPES.find((t) => t.value === selectedType) ||
     POSTING_ACTIVITY_TYPES[0];
 
   const total = data.reduce((sum, item) => sum + Number(item.count || 0), 0);
   const peakMonth = data.reduce(
-    (top, item) =>
-      Number(item.count || 0) > Number(top?.count || 0) ? item : top,
+    (top, item) => (Number(item.count || 0) > Number(top?.count || 0) ? item : top),
     data[0] || null,
   );
 
@@ -713,158 +875,114 @@ function MonthlyPostingActivityCard({
   }));
 
   return (
-    <Card className="h-full overflow-hidden border-border/60 bg-white shadow-sm">
-      <CardHeader className="border-b border-border/60 pb-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
-              style={{ backgroundColor: selectedMeta?.accent ? `${selectedMeta.accent}14` : DASHBOARD_COLORS.posts.bg, color: selectedMeta?.accent || DASHBOARD_COLORS.posts.text }}>
-              <FileText size={18} />
-            </div>
+    <SectionCard
+      title="Monthly Activity"
+      subtitle={`${selectedMeta.label} created across ${selectedYear}`}
+    >
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Select value={selectedType} onValueChange={onTypeChange}>
+          <SelectTrigger className="h-8 w-[160px] cursor-pointer rounded-md border-gray-200 bg-white text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {POSTING_ACTIVITY_TYPES.map((t) => (
+              <SelectItem key={t.value} value={t.value} className="cursor-pointer">
+                {t.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-            <div className="min-w-0">
-              <CardTitle className="text-base font-bold text-foreground">
-                Monthly Posting Activity
-              </CardTitle>
-              <CardDescription className="mt-1 text-xs leading-5">
-                Track monthly activity across posts, surveys, perks, and calendar events.
-              </CardDescription>
-            </div>
+        <Select value={String(selectedYear)} onValueChange={onYearChange}>
+          <SelectTrigger className="h-8 w-[100px] cursor-pointer rounded-md border-gray-200 bg-white text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {yearOptions.map((y) => (
+              <SelectItem key={y} value={String(y)} className="cursor-pointer">
+                {y}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="ml-auto flex items-center gap-4">
+          <div className="text-right">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500">
+              Total
+            </p>
+            <p className="text-sm font-semibold tabular-nums text-gray-900">
+              {formatCount(total)}
+            </p>
           </div>
-
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div>
-              <Label className="mb-1 block text-[11px] font-medium text-muted-foreground">
-                Activity Type
-              </Label>
-              <Select value={selectedType} onValueChange={onTypeChange}>
-                <SelectTrigger className="h-9 rounded-xl border-border bg-white text-xs font-medium">
-                  <SelectValue placeholder="Select activity type" />
-                </SelectTrigger>
-
-                <SelectContent>
-                  {POSTING_ACTIVITY_TYPES.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label className="mb-1 block text-[11px] font-medium text-muted-foreground">
-                Year
-              </Label>
-              <Select value={String(selectedYear)} onValueChange={onYearChange}>
-                <SelectTrigger className="h-9 rounded-xl border-border bg-white text-xs font-medium">
-                  <SelectValue placeholder="Select year" />
-                </SelectTrigger>
-
-                <SelectContent>
-                  {yearOptions.map((year) => (
-                    <SelectItem key={year} value={String(year)}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="text-right">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500">
+              Peak
+            </p>
+            <p className="text-sm font-semibold text-gray-900">
+              {peakMonth?.shortMonth || "—"}
+            </p>
           </div>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="p-5">
-        {loading ? (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_170px]">
-            <div className="h-[260px] animate-pulse rounded-xl bg-muted" />
-            <div className="space-y-3">
-              <div className="h-16 animate-pulse rounded-xl bg-muted" />
-              <div className="h-24 animate-pulse rounded-xl bg-muted" />
-              <div className="h-20 animate-pulse rounded-xl bg-muted" />
-            </div>
-          </div>
-        ) : total === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-8 text-center">
-            <p className="text-sm font-semibold text-foreground">
-              No monthly activity found.
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              No {selectedMeta.label.toLowerCase()} were found for {selectedYear}.
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_180px]">
-            <div className="h-[280px] min-w-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={chartData}
-                  margin={{ top: 10, right: 12, left: 0, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                  <XAxis
-                    dataKey="month"
-                    tick={{ fontSize: 11, fill: "#6B7280" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    allowDecimals={false}
-                    tick={{ fontSize: 11, fill: "#6B7280" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="count" radius={[8, 8, 0, 0]} barSize={22}>
-                    {chartData.map((entry) => (
-                      <Cell key={entry.fullMonth} fill={selectedMeta.accent} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="space-y-3">
-              <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Total {selectedMeta.label}
-                </p>
-                <p className="mt-1 text-2xl font-bold text-foreground">
-                  {formatCount(total)}
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Peak Month
-                </p>
-                <p className="mt-1 text-sm font-bold text-foreground">
-                  {peakMonth?.month || "No data"}
-                </p>
-                <p className="mt-1 text-xs font-medium text-[#3D398C]">
-                  {formatCount(peakMonth?.count || 0)} records
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Filter
-                </p>
-                <p className="mt-1 text-sm font-bold text-foreground">
-                  {selectedMeta.label}
-                </p>
-                <p className="mt-1 text-xs font-medium text-muted-foreground">
-                  Year {selectedYear}
-                </p>
-              </div>
-
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {loading ? (
+        <div className="h-[240px] animate-pulse rounded-md bg-gray-100" />
+      ) : total === 0 ? (
+        <div className="grid h-[240px] place-items-center rounded-md border border-dashed border-gray-200 text-xs text-gray-400">
+          No activity recorded for {selectedYear}
+        </div>
+      ) : (
+        <ChartContainer
+          config={monthlyChartConfig}
+          className="h-[240px] w-full"
+        >
+          <BarChart
+            data={chartData}
+            margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+            <XAxis
+              dataKey="month"
+              tick={{ fontSize: 11, fill: "#6B7280" }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              allowDecimals={false}
+              tick={{ fontSize: 11, fill: "#6B7280" }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <ChartTooltip
+              cursor={{ fill: "#F9FAFB" }}
+              content={
+                <ChartTooltipContent
+                  labelFormatter={(label, payload) =>
+                    payload?.[0]?.payload?.fullMonth || label
+                  }
+                  formatter={(value) => (
+                    <span className="font-semibold tabular-nums text-gray-900">
+                      {formatCount(value)} records
+                    </span>
+                  )}
+                />
+              }
+            />
+            <Bar
+              dataKey="count"
+              radius={[4, 4, 0, 0]}
+              barSize={20}
+              fill={BRAND_BLUE}
+            />
+          </BarChart>
+        </ChartContainer>
+      )}
+    </SectionCard>
   );
 }
+
+/* ───────────────── Most Posted Category (shadcn chart) ───────────────── */
 
 function MostPostedCategoryCard({
   data = [],
@@ -876,206 +994,147 @@ function MostPostedCategoryCard({
   yearOptions = [],
 }) {
   const selectedMeta =
-    POSTING_CATEGORY_TYPES.find((type) => type.value === selectedType) ||
+    POSTING_CATEGORY_TYPES.find((t) => t.value === selectedType) ||
     POSTING_CATEGORY_TYPES[0];
 
   const total = data.reduce((sum, item) => sum + Number(item.count || 0), 0);
   const topCategory = data.reduce(
-    (top, item) =>
-      Number(item.count || 0) > Number(top?.count || 0) ? item : top,
+    (top, item) => (Number(item.count || 0) > Number(top?.count || 0) ? item : top),
     data[0] || null,
   );
 
   const chartData = data
     .filter((item) => Number(item.count || 0) > 0)
-    .slice(0, 8)
+    .slice(0, 6)
     .map((item, index) => ({
       name: item.category,
       shortName:
-        item.category.length > 22
-          ? `${item.category.slice(0, 22)}...`
-          : item.category,
+        item.category.length > 20 ? `${item.category.slice(0, 20)}…` : item.category,
       count: Number(item.count || 0),
       color: CATEGORY_CHART_COLORS[index % CATEGORY_CHART_COLORS.length],
     }));
 
   return (
-    <Card className="h-full overflow-hidden border-border/60 bg-white shadow-sm">
-      <CardHeader className="border-b border-border/60 pb-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
-              style={{ backgroundColor: selectedMeta?.accent ? `${selectedMeta.accent}14` : DASHBOARD_COLORS.calendar.bg, color: selectedMeta?.accent || DASHBOARD_COLORS.calendar.text }}>
-              <Tag size={18} />
-            </div>
+    <SectionCard
+      title="Top Categories"
+      subtitle={`${selectedMeta.label} grouped by category`}
+    >
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Select value={selectedType} onValueChange={onTypeChange}>
+          <SelectTrigger className="h-8 w-[160px] cursor-pointer rounded-md border-gray-200 bg-white text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {POSTING_CATEGORY_TYPES.map((t) => (
+              <SelectItem key={t.value} value={t.value} className="cursor-pointer">
+                {t.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-            <div className="min-w-0">
-              <CardTitle className="text-base font-bold text-foreground">
-                Most Posted Category
-              </CardTitle>
-              <CardDescription className="mt-1 text-xs leading-5">
-                Identify the most used category for calendar events and perks.
-              </CardDescription>
-            </div>
-          </div>
+        <Select value={String(selectedYear)} onValueChange={onYearChange}>
+          <SelectTrigger className="h-8 w-[100px] cursor-pointer rounded-md border-gray-200 bg-white text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {yearOptions.map((y) => (
+              <SelectItem key={y} value={String(y)} className="cursor-pointer">
+                {y}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div>
-              <Label className="mb-1 block text-[11px] font-medium text-muted-foreground">
-                Content Type
-              </Label>
-              <Select value={selectedType} onValueChange={onTypeChange}>
-                <SelectTrigger className="h-9 rounded-xl border-border bg-white text-xs font-medium">
-                  <SelectValue placeholder="Select content type" />
-                </SelectTrigger>
-
-                <SelectContent>
-                  {POSTING_CATEGORY_TYPES.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label className="mb-1 block text-[11px] font-medium text-muted-foreground">
-                Year
-              </Label>
-              <Select value={String(selectedYear)} onValueChange={onYearChange}>
-                <SelectTrigger className="h-9 rounded-xl border-border bg-white text-xs font-medium">
-                  <SelectValue placeholder="Select year" />
-                </SelectTrigger>
-
-                <SelectContent>
-                  {yearOptions.map((year) => (
-                    <SelectItem key={year} value={String(year)}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+        <div className="ml-auto text-right">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-gray-500">
+            Top
+          </p>
+          <p className="max-w-[140px] truncate text-sm font-semibold text-gray-900">
+            {topCategory?.category || "—"}
+          </p>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="p-5">
-        {loading ? (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px]">
-            <div className="h-[260px] animate-pulse rounded-xl bg-muted" />
-            <div className="space-y-3">
-              <div className="h-16 animate-pulse rounded-xl bg-muted" />
-              <div className="h-24 animate-pulse rounded-xl bg-muted" />
-            </div>
-          </div>
-        ) : total === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-8 text-center">
-            <p className="text-sm font-semibold text-foreground">
-              No category data found.
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              No {selectedMeta.label.toLowerCase()} categories were found for {selectedYear}.
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_180px]">
-            <div className="h-[270px] min-w-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={chartData}
-                  layout="vertical"
-                  margin={{ top: 8, right: 14, left: 0, bottom: 4 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
-                  <XAxis
-                    type="number"
-                    allowDecimals={false}
-                    tick={{ fontSize: 11, fill: "#6B7280" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    dataKey="shortName"
-                    type="category"
-                    width={120}
-                    tick={{ fontSize: 11, fill: "#6B7280" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="count" radius={[0, 8, 8, 0]} barSize={18}>
-                    {chartData.map((entry) => (
-                      <Cell key={entry.name} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="space-y-3">
-              <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Total Records
-                </p>
-                <p className="mt-1 text-2xl font-bold text-foreground">
-                  {formatCount(total)}
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Top Category
-                </p>
-                <p className="mt-1 text-sm font-bold text-foreground">
-                  {topCategory?.category || "No data"}
-                </p>
-                <p className="mt-1 text-xs font-medium text-[#3D398C]">
-                  {formatCount(topCategory?.count || 0)} records
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Filter
-                </p>
-                <p className="mt-1 text-sm font-bold text-foreground">
-                  {selectedMeta.label}
-                </p>
-                <p className="mt-1 text-xs font-medium text-muted-foreground">
-                  Year {selectedYear}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {loading ? (
+        <div className="h-[240px] animate-pulse rounded-md bg-gray-100" />
+      ) : total === 0 ? (
+        <div className="grid h-[240px] place-items-center rounded-md border border-dashed border-gray-200 text-xs text-gray-400">
+          No category data for {selectedYear}
+        </div>
+      ) : (
+        <ChartContainer
+          config={categoryChartConfig}
+          className="h-[240px] w-full"
+        >
+          <BarChart
+            data={chartData}
+            layout="vertical"
+            margin={{ top: 4, right: 24, left: 0, bottom: 0 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F3F4F6" />
+            <XAxis
+              type="number"
+              allowDecimals={false}
+              tick={{ fontSize: 11, fill: "#6B7280" }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              dataKey="shortName"
+              type="category"
+              width={120}
+              tick={{ fontSize: 11, fill: "#374151" }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <ChartTooltip
+              cursor={{ fill: "#F9FAFB" }}
+              content={
+                <ChartTooltipContent
+                  labelFormatter={(label, payload) =>
+                    payload?.[0]?.payload?.name || label
+                  }
+                  formatter={(value) => (
+                    <span className="font-semibold tabular-nums text-gray-900">
+                      {formatCount(value)} records
+                    </span>
+                  )}
+                />
+              }
+            />
+            <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={16}>
+              {chartData.map((entry) => (
+                <Cell key={entry.name} fill={entry.color} />
+              ))}
+              <LabelList
+                dataKey="count"
+                position="right"
+                offset={8}
+                className="fill-gray-700"
+                fontSize={11}
+              />
+            </Bar>
+          </BarChart>
+        </ChartContainer>
+      )}
+    </SectionCard>
   );
 }
 
-function MiniCalendarEventsCard({ events, loading, onViewAll }) {
+/* ───────────────── Mini Calendar (fixed nav + full width) ───────────────── */
+
+function MiniCalendarCard({ events, onViewAll }) {
   const today = useMemo(() => new Date(), []);
   const [selectedMonth, setSelectedMonth] = useState(String(today.getMonth()));
   const [selectedYear, setSelectedYear] = useState(String(today.getFullYear()));
 
   const monthNumber = Number(selectedMonth);
   const yearNumber = Number(selectedYear);
-  const selectedMonthLabel = new Date(yearNumber, monthNumber, 1).toLocaleDateString([], {
-    month: "long",
-    year: "numeric",
-  });
-
-  const yearOptions = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-
-    return Array.from({ length: 7 }, (_, index) => String(currentYear - 2 + index));
-  }, []);
-
-  const calendarDays = useMemo(() => {
-    return buildCalendarDays(yearNumber, monthNumber);
-  }, [yearNumber, monthNumber]);
+  const calendarMonth = useMemo(
+    () => new Date(yearNumber, monthNumber, 1),
+    [yearNumber, monthNumber],
+  );
 
   const visibleEvents = useMemo(() => {
     return events
@@ -1087,262 +1146,143 @@ function MiniCalendarEventsCard({ events, loading, onViewAll }) {
       .sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime());
   }, [events]);
 
-  const monthEvents = useMemo(() => {
-    return visibleEvents.filter((event) => {
-      return (
-        event.parsedDate.getFullYear() === yearNumber &&
-        event.parsedDate.getMonth() === monthNumber
-      );
-    });
-  }, [visibleEvents, yearNumber, monthNumber]);
+  const eventDates = useMemo(
+    () => visibleEvents.map((event) => event.parsedDate),
+    [visibleEvents],
+  );
 
-  function hasEventOnDate(date) {
-    return monthEvents.some((event) => isSameDate(event.parsedDate, date));
+  function handleMonthChange(date) {
+    setSelectedMonth(String(date.getMonth()));
+    setSelectedYear(String(date.getFullYear()));
   }
 
   return (
-    <Card className="h-full overflow-hidden border-border/60 bg-white shadow-sm">
-      <CardHeader className="border-b border-border/60 pb-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
-              style={{ backgroundColor: DASHBOARD_COLORS.calendar.bg, color: DASHBOARD_COLORS.calendar.text }}>
-              <CalendarDays size={18} />
-            </div>
+    <SectionCard
+      title="Calendar"
+      subtitle="Scheduled alumni events"
+    >
+      <Calendar
+        mode="single"
+        selected={today}
+        month={calendarMonth}
+        onMonthChange={handleMonthChange}
+        modifiers={{ hasEvent: eventDates }}
+        modifiersClassNames={{
+          hasEvent:
+            "after:absolute after:bottom-0.5 after:left-1/2 after:z-20 after:h-1.5 after:w-1.5 after:-translate-x-1/2 after:rounded-full after:bg-[#F5DA3E]",
+        }}
+        showOutsideDays
+        className="w-full p-0"
+        classNames={{
+          root: "w-full",
+          months: "relative flex w-full flex-col gap-3",
+          month: "flex w-full flex-col gap-3",
+          nav:
+            "absolute inset-x-0 top-0 flex w-full items-center justify-between px-1",
+          button_previous:
+            "h-6 w-6 cursor-pointer rounded-md p-0 text-gray-500 hover:bg-gray-100 hover:text-gray-900",
+          button_next:
+            "h-6 w-6 cursor-pointer rounded-md p-0 text-gray-500 hover:bg-gray-100 hover:text-gray-900",
+          month_caption:
+            "flex h-6 w-full items-center justify-center px-8 text-xs font-semibold text-gray-900",
+          caption_label: "text-xs font-semibold text-gray-900",
+          table: "w-full border-collapse",
+          weekdays: "flex w-full",
+          weekday:
+            "flex-1 pb-1 text-center text-[10px] font-medium text-gray-400",
+          week: "flex w-full",
+          day: "relative flex-1 p-0 text-center",
+          day_button:
+            "pointer-events-none relative mx-auto grid h-8 w-8 min-w-8 cursor-default place-items-center rounded-md border-0 p-0 text-[11px] font-medium text-gray-700 data-[selected-single=true]:bg-[#3D398C] data-[selected-single=true]:text-white",
+          today: "text-[#3D398C]",
+          outside: "text-gray-300",
+          disabled: "text-gray-300 opacity-50",
+        }}
+        components={{
+          Chevron: ({ orientation }) =>
+            orientation === "left" ? (
+              <ChevronLeft className="h-3.5 w-3.5" />
+            ) : orientation === "right" ? (
+              <ChevronRight className="h-3.5 w-3.5" />
+            ) : null,
+        }}
+      />
 
-            <div className="min-w-0">
-              <CardTitle className="text-base font-bold text-foreground">
-                Calendar Events
-              </CardTitle>
-              <CardDescription className="mt-1 text-xs leading-5">
-                View scheduled alumni activities and events.
-              </CardDescription>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onViewAll}
-            className="shrink-0 text-xs font-semibold text-[#3D398C] transition hover:text-[#312d73]"
-          >
-            View all
-          </button>
+      <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-3">
+        <div className="flex items-center gap-2 text-xs font-medium text-gray-600">
+          <span
+            className="h-2 w-2 rounded-full"
+            style={{ backgroundColor: NU_YELLOW }}
+          />
+          <span>Event</span>
         </div>
-      </CardHeader>
-
-      <CardContent className="p-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="relative h-8 w-[88px] justify-center rounded-xl border-border bg-white px-3 text-center text-xs font-medium [&>span]:w-full [&>span]:text-center [&>svg]:absolute [&>svg]:right-2">
-              <SelectValue placeholder="Month" />
-            </SelectTrigger>
-
-            <SelectContent>
-              {MONTH_OPTIONS.map((month) => (
-                <SelectItem key={month.value} value={month.value}>
-                  {month.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <p className="flex-1 text-center text-sm font-bold text-foreground">
-            {selectedMonthLabel}
-          </p>
-
-          <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="relative h-8 w-[88px] justify-center rounded-xl border-border bg-white px-3 text-center text-xs font-medium [&>span]:w-full [&>span]:text-center [&>svg]:absolute [&>svg]:right-2">
-              <SelectValue placeholder="Year" />
-            </SelectTrigger>
-
-            <SelectContent>
-              {yearOptions.map((year) => (
-                <SelectItem key={year} value={year}>
-                  {year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="rounded-2xl border border-border/70 bg-white p-4 shadow-sm">
-          <div className="grid grid-cols-7 gap-1 text-center">
-            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
-              <div
-                key={day}
-                className="pb-2 text-[11px] font-semibold text-muted-foreground"
-              >
-                {day}
-              </div>
-            ))}
-
-            {calendarDays.map((date) => {
-              const isCurrentMonth = date.getMonth() === monthNumber;
-              const isToday = isSameDate(date, today);
-              const hasEvent = hasEventOnDate(date);
-
-              return (
-                <div
-                  key={date.toISOString()}
-                  className="flex h-9 items-center justify-center"
-                >
-                  <div
-                    className={[
-                      "relative grid h-8 w-8 place-items-center rounded-xl text-xs font-semibold transition",
-                      isToday
-                        ? "bg-[#3D398C] text-white"
-                        : isCurrentMonth
-                          ? "text-foreground hover:bg-muted"
-                          : "text-muted-foreground/35",
-                    ].join(" ")}
-                  >
-                    {date.getDate()}
-
-                    {hasEvent ? (
-                      <span
-                        className={[
-                          "absolute bottom-1 h-1 w-1 rounded-full",
-                          isToday ? "bg-white" : "bg-[#3D398C]",
-                        ].join(" ")}
-                      />
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="mt-4">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            This Month
-          </p>
-
-          {loading ? (
-            <div className="space-y-2">
-              <div className="h-10 animate-pulse rounded-xl bg-muted" />
-              <div className="h-10 animate-pulse rounded-xl bg-muted" />
-            </div>
-          ) : monthEvents.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-muted/20 px-3 py-4 text-center">
-              <p className="text-xs font-medium text-muted-foreground">
-                No events scheduled this month.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {monthEvents.slice(0, 4).map((event) => (
-                <div
-                  key={event.id}
-                  className="rounded-xl border border-border/70 bg-muted/20 px-3 py-2"
-                >
-                  <p className="truncate text-xs font-semibold text-foreground">
-                    {getEventTitle(event)}
-                  </p>
-                  <p className="mt-0.5 text-[11px] font-medium text-muted-foreground">
-                    {formatDate(event.parsedDate)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+        <ViewAllButton onClick={onViewAll} label="View" />
+      </div>
+    </SectionCard>
   );
 }
 
-function RecentListCard({
-  icon: Icon,
-  color = DASHBOARD_COLORS.posts,
-  title,
-  description,
+/* ───────────────── Recent Activity Lists ───────────────── */
+
+function RecentActivityList({
   items = [],
   loading = false,
-  emptyText = "No recent items found.",
+  emptyText = "No recent items",
   getTitle,
   getDate,
-  onViewAll,
+  getMeta,
+  onItemClick,
 }) {
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        <div className="h-11 animate-pulse rounded bg-gray-100" />
+        <div className="h-11 animate-pulse rounded bg-gray-100" />
+        <div className="h-11 animate-pulse rounded bg-gray-100" />
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return <p className="py-6 text-center text-xs text-gray-400">{emptyText}</p>;
+  }
+
   return (
-    <Card className="h-full overflow-hidden border-border/60 bg-white shadow-sm">
-      <CardHeader className="border-b border-border/60 pb-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
-            <div
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
-              style={{ backgroundColor: color.bg, color: color.text }}
-            >
-              <Icon size={18} />
-            </div>
-            <div className="min-w-0">
-              <CardTitle className="text-base font-bold text-foreground">
-                {title}
-              </CardTitle>
-              <CardDescription className="mt-1 text-xs leading-5">
-                {description}
-              </CardDescription>
-            </div>
-          </div>
-
-          {onViewAll ? (
-            <button
-              type="button"
-              onClick={onViewAll}
-              className="shrink-0 text-xs font-semibold text-[#3D398C] transition hover:text-[#312d73]"
-            >
-              View all
-            </button>
-          ) : null}
-        </div>
-      </CardHeader>
-
-      <CardContent className="p-4">
-        {loading ? (
-          <div className="space-y-2">
-            <div className="h-12 animate-pulse rounded-xl bg-muted" />
-            <div className="h-12 animate-pulse rounded-xl bg-muted" />
-            <div className="h-12 animate-pulse rounded-xl bg-muted" />
-          </div>
-        ) : items.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-muted/20 px-3 py-8 text-center">
-            <p className="text-xs font-medium text-muted-foreground">
-              {emptyText}
+    <ul className="w-full divide-y divide-gray-100">
+      {items.slice(0, 5).map((item) => (
+        <li key={item.id}>
+          <button
+            type="button"
+            onClick={onItemClick}
+            className="grid w-full cursor-pointer gap-0.5 px-4 py-2.5 text-left transition hover:bg-gray-50"
+          >
+            <p className="truncate text-xs font-semibold text-gray-900">
+              {getTitle(item)}
             </p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {items.slice(0, 5).map((item) => (
-              <div
-                key={item.id}
-                className="rounded-xl border border-border/70 bg-muted/20 px-3 py-2.5 transition hover:bg-muted/40"
-              >
-                <p className="truncate text-sm font-semibold text-foreground">
-                  {getTitle(item)}
-                </p>
-                <p className="mt-0.5 text-[11px] font-medium text-muted-foreground">
-                  {formatDate(getDate(item))}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+            {getMeta ? (
+              <p className="truncate text-[11px] leading-4 text-gray-500">
+                {getMeta(item)}
+              </p>
+            ) : null}
+            <p className="text-[11px] leading-4 text-gray-500">
+              {formatShortDate(getDate(item))}
+            </p>
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 
+/* ───────────────── Alumni helpers ───────────────── */
 
 function getAlumniDisplayName(alumni = {}) {
   const personalInfo = alumni?.personalInformation || {};
-
   const fullName = safeText(personalInfo?.fullName);
   if (fullName) return fullName;
-
   const firstName = safeText(personalInfo?.firstName);
   const middleName = safeText(personalInfo?.middleName);
   const lastName = safeText(personalInfo?.lastName);
-
   return [firstName, middleName, lastName].filter(Boolean).join(" ") || "Unnamed Alumni";
 }
 
@@ -1355,13 +1295,8 @@ function getAlumniEmail(alumni = {}) {
   );
 }
 
-function getAlumniStudentId(alumni = {}) {
-  return safeText(alumni?.alumniInformation?.studentId) || "—";
-}
-
 function getAlumniProgram(alumni = {}) {
   const info = alumni?.alumniInformation || {};
-
   return (
     safeText(info?.courseGraduated) ||
     safeText(info?.course) ||
@@ -1410,7 +1345,6 @@ function getAlumniRegisteredTime(alumni = {}) {
   return getAlumniRegisteredDate(alumni)?.getTime?.() || 0;
 }
 
-
 function getArrayValue(value) {
   return Array.isArray(value) ? value.filter(Boolean) : [];
 }
@@ -1424,10 +1358,8 @@ function hasValue(value) {
 function getProfileResume(alumni = {}) {
   const resume = alumni?.background?.resume || alumni?.resume || null;
   if (resume?.url) return resume;
-
   const legacyResume = getArrayValue(alumni?.personalization?.resumeUrl);
   if (legacyResume.length > 0) return { url: legacyResume[0] };
-
   return null;
 }
 
@@ -1480,399 +1412,272 @@ function calculateAlumniProfileCompletion(alumni = {}) {
 
   const filled = checks.filter(Boolean).length;
   const total = checks.length || 1;
-
   return Math.round((filled / total) * 100);
 }
 
-function AverageAlumniProfileCompletionCard({ value = 0, totalAlumni = 0, loading = false }) {
+/* ───────────────── Profile Completion Card ───────────────── */
+
+function ProfileCompletionCard({ value = 0, totalAlumni = 0, loading = false }) {
   const normalizedValue = Math.max(0, Math.min(100, Math.round(Number(value || 0))));
 
   return (
-    <Card className="h-full overflow-hidden border-border/60 bg-white shadow-sm">
-      <CardHeader className="border-b border-border/60 pb-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <div
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
-            style={{
-              backgroundColor: DASHBOARD_COLORS.alumni.bg,
-              color: DASHBOARD_COLORS.alumni.text,
-            }}
-          >
-            <Users size={18} />
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <CardTitle className="text-base font-bold text-foreground">
-              Average Alumni Profile Completion
-            </CardTitle>
-
-            <CardDescription className="mt-1 text-xs leading-5">
-              Average completion rate of registered alumni profiles.
-            </CardDescription>
-          </div>
+    <SectionCard
+      title="Profile Completion"
+      subtitle="Average across registered alumni"
+    >
+      {loading ? (
+        <div className="space-y-3">
+          <div className="h-8 w-24 animate-pulse rounded bg-gray-100" />
+          <div className="h-2 w-full animate-pulse rounded-full bg-gray-100" />
         </div>
-      </CardHeader>
-
-      <CardContent className="p-5">
-        {loading ? (
-          <div className="space-y-4">
-            <div className="h-8 w-24 animate-pulse rounded-md bg-muted" />
-            <div className="h-3 w-full animate-pulse rounded-full bg-muted" />
-            <div className="h-4 w-64 animate-pulse rounded bg-muted" />
-          </div>
-        ) : totalAlumni === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-8 text-center">
-            <p className="text-sm font-semibold text-foreground">
-              No alumni profiles found.
+      ) : totalAlumni === 0 ? (
+        <p className="py-6 text-center text-xs text-gray-400">
+          No alumni profiles found
+        </p>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-baseline gap-2">
+            <p className="text-3xl font-semibold tracking-tight tabular-nums text-gray-900">
+              {normalizedValue}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Average profile completion will appear once alumni records are available.
-            </p>
+            <p className="text-sm font-medium text-gray-500">%</p>
           </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="text-3xl font-bold tracking-tight text-foreground">
-                  {normalizedValue}%
-                </p>
-                <p className="mt-1 text-xs font-medium text-muted-foreground">
-                  Average across {formatCount(totalAlumni)} registered alumni
-                </p>
-              </div>
 
-              <div className="rounded-xl border border-border/70 bg-muted/20 px-3 py-2 text-right">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Status
-                </p>
-                <p className="mt-0.5 text-sm font-bold text-foreground">
-                  {normalizedValue >= 80
-                    ? "Strong"
-                    : normalizedValue >= 50
-                      ? "Moderate"
-                      : "Needs Update"}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="h-3 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full transition-all duration-700 ease-out"
-                  style={{
-                    width: `${normalizedValue}%`,
-                    backgroundColor: DASHBOARD_COLORS.alumni.text,
-                  }}
-                />
-              </div>
-
-              <div className="flex justify-between text-[11px] font-medium text-muted-foreground">
-                <span>0%</span>
-                <span>50%</span>
-                <span>100%</span>
-              </div>
-            </div>
-
-            <p className="text-xs leading-5 text-muted-foreground">
-              Based on profile details such as about me, resume, personal information,
-              academic information, career details, skills, and contact information.
-            </p>
+          <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
+            <div
+              className="h-full rounded-full bg-[#3D398C] transition-all duration-700 ease-out"
+              style={{ width: `${normalizedValue}%` }}
+            />
           </div>
-        )}
-      </CardContent>
-    </Card>
+
+          <p className="text-xs text-gray-500">
+            Based on {formatCount(totalAlumni)} alumni records.
+          </p>
+        </div>
+      )}
+    </SectionCard>
   );
 }
 
-function RecentlyRegisteredAlumniCard({ alumni = [], loading = false, onViewAll }) {
+/* ───────────────── Recent Activity ───────────────── */
+
+function RecentActivityCard({
+  alumni = [],
+  alumniLoading = false,
+  posts = [],
+  postsLoading = false,
+  events = [],
+  eventsLoading = false,
+  perks = [],
+  perksLoading = false,
+  onViewAlumni,
+  onViewPosts,
+  onViewEvents,
+  onViewPerks,
+}) {
+  const [activeTab, setActiveTab] = useState("alumni");
+
   const sortedAlumni = useMemo(() => {
     return [...alumni].sort(
       (a, b) => getAlumniRegisteredTime(b) - getAlumniRegisteredTime(a),
     );
   }, [alumni]);
 
-  const latestAlumni = sortedAlumni[0] || null;
+  const sortedEvents = useMemo(() => {
+    return events
+      .map((event) => ({
+        ...event,
+        parsedDate: parseDateSafe(event?.eventDate || event?.startDate || event?.date),
+      }))
+      .filter((event) => event.parsedDate)
+      .sort((a, b) => b.parsedDate.getTime() - a.parsedDate.getTime());
+  }, [events]);
+
+  const tabActions = {
+    alumni: {
+      label: "View all in Alumni",
+      onClick: onViewAlumni,
+    },
+    posts: {
+      label: "View all in Posts",
+      onClick: onViewPosts,
+    },
+    events: {
+      label: "View all in Events",
+      onClick: onViewEvents,
+    },
+    perks: {
+      label: "View all in Perks & Discounts",
+      onClick: onViewPerks,
+    },
+  };
+
+  const activeAction = tabActions[activeTab] || tabActions.alumni;
+  const tabTriggerClass =
+    "h-8 min-w-fit flex-none cursor-pointer rounded-none px-0 text-[11px] font-semibold text-gray-500 transition-colors hover:text-gray-900 data-active:text-[#3D398C] data-[state=active]:text-[#3D398C] after:bg-[#3D398C]";
+  const tabContentClass =
+    "mt-0 data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:slide-in-from-bottom-1 data-[state=active]:duration-200";
 
   return (
-    <Card className="h-full overflow-hidden border-border/60 bg-white shadow-sm">
-      <CardHeader className="border-b border-border/60 pb-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
-            style={{ backgroundColor: DASHBOARD_COLORS.alumni.bg, color: DASHBOARD_COLORS.alumni.text }}>
-            <Users size={18} />
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <CardTitle className="text-base font-bold text-foreground">
-              Recently Registered Alumni
-            </CardTitle>
-
-            <CardDescription className="mt-1 text-xs leading-5">
-              Latest alumni accounts registered in the system.
-            </CardDescription>
-          </div>
+    <SectionCard
+      title="Recent Activity"
+      subtitle="Latest records"
+      bodyClassName="p-0"
+    >
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-0">
+        <div className="border-b border-gray-200 px-4">
+          <TabsList
+            variant="line"
+            className="flex h-9 w-full justify-start gap-3 overflow-x-auto rounded-none bg-transparent p-0 group-data-horizontal/tabs:h-9"
+          >
+            <TabsTrigger value="alumni" className={tabTriggerClass}>
+              Alumni
+            </TabsTrigger>
+            <TabsTrigger value="posts" className={tabTriggerClass}>
+              Posts
+            </TabsTrigger>
+            <TabsTrigger value="events" className={tabTriggerClass}>
+              Events
+            </TabsTrigger>
+            <TabsTrigger value="perks" className={tabTriggerClass}>
+              Perks
+            </TabsTrigger>
+          </TabsList>
         </div>
-      </CardHeader>
 
-      <CardContent className="p-5">
-        {loading ? (
-          <div className="space-y-3">
-            <div className="h-12 animate-pulse rounded-xl bg-muted" />
-            <div className="h-12 animate-pulse rounded-xl bg-muted" />
-            <div className="h-12 animate-pulse rounded-xl bg-muted" />
-          </div>
-        ) : sortedAlumni.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-8 text-center">
-            <p className="text-sm font-semibold text-foreground">
-              No recently registered alumni found.
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Newly registered alumni accounts will appear here once available.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-border/70 bg-muted/20 px-3 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Latest Alumni
-                </p>
-                <p className="mt-1 truncate text-sm font-bold text-foreground">
-                  {getAlumniDisplayName(latestAlumni)}
-                </p>
-              </div>
+        <div>
+          <TabsContent value="alumni" className={tabContentClass}>
+            <RecentActivityList
+              items={sortedAlumni}
+              loading={alumniLoading}
+              emptyText="No alumni registered yet"
+              getTitle={getAlumniDisplayName}
+              getMeta={(alum) => `${getAlumniProgram(alum)} ${getAlumniEmail(alum)}`}
+              getDate={getAlumniRegisteredDate}
+              onItemClick={onViewAlumni}
+            />
+          </TabsContent>
 
-              <div className="rounded-xl border border-border/70 bg-muted/20 px-3 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Recent Records
-                </p>
-                <p className="mt-1 text-sm font-bold text-foreground">
-                  {formatCount(sortedAlumni.length)} shown
-                </p>
-              </div>
-            </div>
+          <TabsContent value="posts" className={tabContentClass}>
+            <RecentActivityList
+              items={posts}
+              loading={postsLoading}
+              emptyText="No recent posts"
+              getTitle={getPostTitle}
+              getMeta={getPostCategory}
+              getDate={(post) => post.createdAt || post.publishedAt || post.updatedAt}
+              onItemClick={onViewPosts}
+            />
+          </TabsContent>
 
-            <div className="overflow-hidden rounded-xl border border-border/70 bg-white">
-              <div className="grid grid-cols-[minmax(0,1fr)_96px] border-b border-border/60 bg-muted/30 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid-cols-[minmax(0,1fr)_120px_90px]">
-                <span>Alumni</span>
-                <span className="hidden sm:block">Program</span>
-                <span className="text-right">Registered</span>
-              </div>
+          <TabsContent value="events" className={tabContentClass}>
+            <RecentActivityList
+              items={sortedEvents}
+              loading={eventsLoading}
+              emptyText="No recent events"
+              getTitle={getEventTitle}
+              getMeta={getEventCategory}
+              getDate={(event) => event.parsedDate}
+              onItemClick={onViewEvents}
+            />
+          </TabsContent>
 
-              <div className="divide-y divide-border/60">
-                {sortedAlumni.slice(0, 5).map((item) => (
-                  <div
-                    key={item.id}
-                    className="grid grid-cols-[minmax(0,1fr)_96px] items-center gap-3 px-3 py-3 transition hover:bg-muted/30 sm:grid-cols-[minmax(0,1fr)_120px_90px]"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-foreground">
-                        {getAlumniDisplayName(item)}
-                      </p>
-                      <p className="mt-0.5 truncate text-[11px] font-medium text-muted-foreground">
-                        {getAlumniEmail(item)}
-                      </p>
-                      <p className="mt-0.5 text-[10px] font-medium text-muted-foreground sm:hidden">
-                        {getAlumniProgram(item)} · {getAlumniStudentId(item)}
-                      </p>
-                    </div>
+          <TabsContent value="perks" className={tabContentClass}>
+            <RecentActivityList
+              items={perks}
+              loading={perksLoading}
+              emptyText="No recent perks"
+              getTitle={getPerkTitle}
+              getMeta={getPerkCategory}
+              getDate={(perk) => perk.createdAt || perk.publishedAt || perk.updatedAt}
+              onItemClick={onViewPerks}
+            />
+          </TabsContent>
+        </div>
 
-                    <div className="hidden min-w-0 sm:block">
-                      <p className="truncate text-xs font-semibold text-foreground">
-                        {getAlumniProgram(item)}
-                      </p>
-                      <p className="mt-0.5 truncate text-[10px] font-medium text-muted-foreground">
-                        {getAlumniStudentId(item)}
-                      </p>
-                    </div>
-
-                    <p className="text-right text-xs font-medium text-muted-foreground">
-                      {formatDate(getAlumniRegisteredDate(item))}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {onViewAll ? (
-              <button
-                type="button"
-                onClick={onViewAll}
-                className="w-full rounded-xl border border-border/70 bg-muted/20 px-3 py-2 text-xs font-semibold text-[#3D398C] transition hover:bg-[#3D398C]/5 hover:text-[#312d73]"
-              >
-                View all alumni records
-              </button>
-            ) : null}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+        <div className="flex justify-end border-t border-gray-200 px-4 py-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={activeAction.onClick}
+            className="h-auto min-h-7 max-w-full cursor-pointer justify-end whitespace-normal px-2 text-right text-[11px] font-medium leading-snug text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+          >
+            <span className="min-w-0">{activeAction.label}</span>
+            <ArrowUpRight size={12} className="ml-1 shrink-0" />
+          </Button>
+        </div>
+      </Tabs>
+    </SectionCard>
   );
 }
 
-function AlumniRegistrationOverviewChart({ data = [], total = 0, loading = false }) {
-  if (loading) {
-    return <div className="h-[170px] w-full animate-pulse rounded-xl bg-muted" />;
-  }
+/* ───────────────── Alumni Registration ───────────────── */
 
-  if (!total) {
-    return (
-      <div className="grid h-[170px] place-items-center rounded-xl border border-dashed border-border bg-muted/20 text-xs font-medium text-muted-foreground">
-        No chart data
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative w-full max-w-[190px]">
-      <RechartsDonutChart data={data} loading={false} height={170} />
-      <div className="pointer-events-none absolute inset-0 grid place-items-center">
-        <div className="text-center">
-          <p className="text-lg font-bold text-foreground">
-            {formatCount(total)}
-          </p>
-          <p className="text-[10px] font-medium text-muted-foreground">
-            total
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AlumniRegistrationOverviewCard({ counts = DASHBOARD_COUNTS_INITIAL, loading = false }) {
+function AlumniRegistrationCard({ counts = DASHBOARD_COUNTS_INITIAL, loading = false }) {
   const registered = Number(counts.registeredAlumni || 0);
   const transitioning = Number(counts.transitioningAlumni || 0);
   const preRegistered = Number(counts.preRegisteredAlumni || 0);
   const total = registered + transitioning + preRegistered;
 
-  const chartData = [
-    {
-      name: "Registered",
-      value: registered,
-      color: ALUMNI_REGISTRATION_COLORS.registered,
-    },
-    {
-      name: "Transitioning",
-      value: transitioning,
-      color: ALUMNI_REGISTRATION_COLORS.transitioning,
-    },
-    {
-      name: "Pre-registered",
-      value: preRegistered,
-      color: ALUMNI_REGISTRATION_COLORS.preRegistered,
-    },
-  ];
-
-  const labelItems = [
-    {
-      label: "Registered",
-      value: registered,
-      color: ALUMNI_REGISTRATION_COLORS.registered,
-      helper: "Active alumni accounts",
-    },
-    {
-      label: "Transitioning",
-      value: transitioning,
-      color: ALUMNI_REGISTRATION_COLORS.transitioning,
-      helper: "Interns queued for transition",
-    },
-    {
-      label: "Pre-registered",
-      value: preRegistered,
-      color: ALUMNI_REGISTRATION_COLORS.preRegistered,
-      helper: "Records not yet claimed",
-    },
+  const data = [
+    { name: "Registered", value: registered, color: STATUS_COLORS.registered },
+    { name: "Transitioning", value: transitioning, color: STATUS_COLORS.transitioning },
+    { name: "Pre-registered", value: preRegistered, color: STATUS_COLORS.preRegistered },
   ];
 
   return (
-    <Card className="h-full overflow-hidden border-border/60 bg-white shadow-sm">
-      <CardHeader className="border-b border-border/60 pb-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
-            style={{ backgroundColor: DASHBOARD_COLORS.alumni.bg, color: DASHBOARD_COLORS.alumni.text }}>
-            <PieChartIcon size={18} />
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <CardTitle className="text-base font-bold text-foreground">
-              Alumni Registration Overview
-            </CardTitle>
-
-            <CardDescription className="mt-1 text-xs leading-5">
-              Comparison of registered, transitioning, and pre-registered alumni records.
-            </CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent className="p-5">
-        {loading ? (
-          <div className="grid items-center gap-5 md:grid-cols-[minmax(0,1fr)_190px]">
-            <div className="space-y-3">
-              <div className="h-14 animate-pulse rounded-xl bg-muted" />
-              <div className="h-14 animate-pulse rounded-xl bg-muted" />
-              <div className="h-14 animate-pulse rounded-xl bg-muted" />
-            </div>
-            <div className="h-[170px] animate-pulse rounded-xl bg-muted" />
-          </div>
-        ) : total === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-8 text-center">
-            <p className="text-sm font-semibold text-foreground">
-              No alumni registration records yet.
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Registration totals will appear here once records are available.
-            </p>
-          </div>
-        ) : (
-          <div className="grid items-center gap-5 md:grid-cols-[minmax(0,1fr)_190px]">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-foreground">
-                Alumni Records Summary
-              </p>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 md:grid-cols-1">
-                {labelItems.map((item) => (
-                  <div
-                    key={item.label}
-                    className="rounded-xl border border-border/70 bg-muted/20 px-3 py-3"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span
-                          className="h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: item.color }}
-                        />
-                        <span className="truncate text-sm font-medium text-muted-foreground">
-                          {item.label}
-                        </span>
-                      </div>
-                      <span className="text-sm font-bold text-foreground">
-                        {formatCount(item.value)}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-[11px] font-medium text-muted-foreground">
-                      {formatPercent(total ? (item.value / total) * 100 : 0)} of total · {item.helper}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <AlumniRegistrationOverviewChart
-              data={chartData}
-              total={total}
-              loading={loading}
+    <SectionCard
+      title="Alumni Breakdown"
+      subtitle="By registration status"
+      className="h-full"
+      bodyClassName="flex flex-1 flex-col p-4"
+    >
+      {loading ? (
+        <div className="h-[160px] animate-pulse rounded-md bg-gray-100" />
+      ) : total === 0 ? (
+        <p className="py-6 text-center text-xs text-gray-400">
+          No alumni records yet
+        </p>
+      ) : (
+        <div className="flex flex-1 flex-col">
+          <MiniDonut
+            data={data}
+            loading={false}
+            centerLabel="total"
+            centerValue={formatCount(total)}
+          />
+          <div className="mt-auto border-t border-gray-100 pt-3">
+            <LegendRow
+              items={data.map((d) => ({
+                label: d.name,
+                value: d.value,
+                color: d.color,
+              }))}
             />
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+      )}
+    </SectionCard>
   );
 }
 
 const API_BASE_URL = "http://127.0.0.1:8000/api";
+
+// These modules are not present yet in the current Django backend.
+// Keeping them disabled prevents repeated 404 requests while preserving the original UI sections.
+const DISABLED_OPTIONAL_DASHBOARD_ENDPOINT_PREFIXES = [
+  "/posts/",
+  "/surveys/",
+  "/perks-discounts/",
+  "/calendar-events/",
+];
+
+function shouldSkipDashboardEndpoint(endpoint = "") {
+  return DISABLED_OPTIONAL_DASHBOARD_ENDPOINT_PREFIXES.some((prefix) =>
+    endpoint.startsWith(prefix),
+  );
+}
 
 function getStoredAccount() {
   try {
@@ -1920,6 +1725,10 @@ function asList(data) {
 
 async function fetchFirstList(endpoints = []) {
   for (const endpoint of endpoints) {
+    if (shouldSkipDashboardEndpoint(endpoint)) {
+      continue;
+    }
+
     try {
       const data = await apiRequest(endpoint);
       return asList(data);
@@ -1952,12 +1761,12 @@ async function loadDashboardCounts() {
   const [alumni, preRegisteredAlumni, interns, posts, surveys, perks, events] =
     await Promise.all([
       loadAlumniRows(),
-      fetchFirstList(["/pre-registered-alumni/", "/pre_registered_alumni/"]),
+      fetchFirstList(["/pre-registered-alumni/"]),
       loadInternRows(),
-      fetchFirstList(["/posts/", "/news-posts/", "/newsPosts/"]),
+      fetchFirstList(["/posts/"]),
       fetchFirstList(["/surveys/"]),
-      fetchFirstList(["/perks-discounts/", "/perksDiscounts/"]),
-      fetchFirstList(["/calendar-events/", "/calendarEvents/"]),
+      fetchFirstList(["/perks-discounts/"]),
+      fetchFirstList(["/calendar-events/"]),
     ]);
 
   const transitioningAlumni = interns.filter(
@@ -2013,7 +1822,7 @@ async function loadAvailableSurveys() {
 }
 
 async function loadCalendarEvents() {
-  const events = await fetchFirstList(["/calendar-events/", "/calendarEvents/"]);
+  const events = await fetchFirstList(["/calendar-events/"]);
   return events.filter(isVisibleEvent).sort((a, b) => {
     const aDate = parseDateSafe(a?.eventDate || a?.startDate || a?.date || a?.createdAt);
     const bDate = parseDateSafe(b?.eventDate || b?.startDate || b?.date || b?.createdAt);
@@ -2022,7 +1831,7 @@ async function loadCalendarEvents() {
 }
 
 async function loadRecentPosts() {
-  const posts = await fetchFirstList(["/posts/", "/news-posts/", "/newsPosts/"]);
+  const posts = await fetchFirstList(["/posts/"]);
   return posts
     .filter(isVisiblePost)
     .sort((a, b) => (getCreatedDate(b)?.getTime() || 0) - (getCreatedDate(a)?.getTime() || 0))
@@ -2030,7 +1839,7 @@ async function loadRecentPosts() {
 }
 
 async function loadRecentPerksDiscounts() {
-  const perks = await fetchFirstList(["/perks-discounts/", "/perksDiscounts/"]);
+  const perks = await fetchFirstList(["/perks-discounts/"]);
   return perks
     .filter(isVisiblePerk)
     .sort((a, b) => (getCreatedDate(b)?.getTime() || 0) - (getCreatedDate(a)?.getTime() || 0))
@@ -2046,10 +1855,10 @@ async function loadMonthlyPostingActivity({
     POSTING_ACTIVITY_TYPES[0];
 
   const endpointMap = {
-    posts: ["/posts/", "/news-posts/", "/newsPosts/"],
+    posts: ["/posts/"],
     surveys: ["/surveys/"],
-    perks: ["/perks-discounts/", "/perksDiscounts/"],
-    events: ["/calendar-events/", "/calendarEvents/"],
+    perks: ["/perks-discounts/"],
+    events: ["/calendar-events/"],
   };
 
   const rows = await fetchFirstList(endpointMap[type] || []);
@@ -2090,8 +1899,8 @@ async function loadMostPostedCategory({
   year = new Date().getFullYear(),
 } = {}) {
   const endpointMap = {
-    perks: ["/perks-discounts/", "/perksDiscounts/"],
-    events: ["/calendar-events/", "/calendarEvents/"],
+    perks: ["/perks-discounts/"],
+    events: ["/calendar-events/"],
   };
 
   const rows = await fetchFirstList(endpointMap[type] || []);
@@ -2169,24 +1978,68 @@ async function loadSurveyEngagement(selectedSurveyId, registeredAlumniCount) {
   };
 }
 
+
+async function loadSurveyOverview(surveys = []) {
+  if (!surveys.length) return SURVEY_OVERVIEW_INITIAL;
+
+  const results = await Promise.allSettled(
+    surveys.map(async (survey) => {
+      const responses = await fetchFirstList([
+        `/surveys/${survey.id}/responses/`,
+        `/survey-responses/?survey=${survey.id}`,
+      ]);
+
+      return {
+        id: survey.id,
+        title: getSurveyTitle(survey),
+        responseCount: responses.length,
+      };
+    }),
+  );
+
+  const rows = results
+    .filter((result) => result.status === "fulfilled")
+    .map((result) => result.value);
+
+  const activeSurveyCount = surveys.length;
+  const totalResponses = rows.reduce(
+    (sum, row) => sum + Number(row.responseCount || 0),
+    0,
+  );
+  const surveysWithResponses = rows.filter(
+    (row) => Number(row.responseCount || 0) > 0,
+  ).length;
+  const topSurvey = rows.reduce(
+    (top, row) =>
+      Number(row.responseCount || 0) > Number(top?.responseCount || 0)
+        ? row
+        : top,
+    rows[0] || null,
+  );
+
+  return {
+    activeSurveyCount,
+    surveysWithResponses,
+    surveysWithoutResponses: Math.max(activeSurveyCount - surveysWithResponses, 0),
+    totalResponses,
+    averageResponses:
+      activeSurveyCount > 0 ? Math.round(totalResponses / activeSurveyCount) : 0,
+    topSurveyTitle: safeText(topSurvey?.title),
+    topSurveyResponses: Number(topSurvey?.responseCount || 0),
+  };
+}
 export default function OfficerDashboardPage() {
   const navigate = useNavigate();
-  const account = getStoredAccount();
 
-  const [dashboardCounts, setDashboardCounts] = useState(
-    DASHBOARD_COUNTS_INITIAL,
-  );
+  const [dashboardCounts, setDashboardCounts] = useState(DASHBOARD_COUNTS_INITIAL);
   const [countsLoading, setCountsLoading] = useState(true);
   const [countsError, setCountsError] = useState("");
 
   const [availableSurveys, setAvailableSurveys] = useState([]);
-  const [selectedSurveyId, setSelectedSurveyId] = useState("");
   const [surveysLoading, setSurveysLoading] = useState(true);
-  const [surveyEngagement, setSurveyEngagement] = useState(
-    SURVEY_ENGAGEMENT_INITIAL,
-  );
-  const [engagementLoading, setEngagementLoading] = useState(false);
-  const [engagementError, setEngagementError] = useState("");
+  const [surveyOverview, setSurveyOverview] = useState(SURVEY_OVERVIEW_INITIAL);
+  const [surveyOverviewLoading, setSurveyOverviewLoading] = useState(false);
+  const [surveyOverviewError, setSurveyOverviewError] = useState("");
 
   const [recentRegisteredAlumni, setRecentRegisteredAlumni] = useState([]);
   const [recentRegisteredAlumniLoading, setRecentRegisteredAlumniLoading] = useState(true);
@@ -2221,43 +2074,17 @@ export default function OfficerDashboardPage() {
     return Array.from({ length: 7 }, (_, index) => String(currentYear - 4 + index));
   }, []);
 
-  const userEmail = account?.email || "—";
-
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-
-    return "Good evening";
-  }, []);
-
-  const recentEvents = useMemo(() => {
-    return calendarEvents
-      .map((event) => ({
-        ...event,
-        parsedDate: parseDateSafe(event?.eventDate || event?.startDate || event?.date),
-      }))
-      .filter((event) => event.parsedDate)
-      .sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime())
-      .slice(0, 5);
-  }, [calendarEvents]);
-
   useEffect(() => {
     let mounted = true;
-
     async function run() {
       try {
         setCountsLoading(true);
         setCountsError("");
-
         const nextCounts = await loadDashboardCounts();
-
         if (!mounted) return;
         setDashboardCounts(nextCounts);
       } catch (error) {
         console.error("Failed to load officer dashboard counts:", error);
-
         if (!mounted) return;
         setCountsError(error?.message || "Failed to load dashboard totals.");
         setDashboardCounts(DASHBOARD_COUNTS_INITIAL);
@@ -2265,137 +2092,94 @@ export default function OfficerDashboardPage() {
         if (mounted) setCountsLoading(false);
       }
     }
-
     run();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
     let mounted = true;
-
     async function run() {
       try {
         setRecentRegisteredAlumniLoading(true);
-
         const alumni = await loadRecentlyRegisteredAlumni();
-
         if (!mounted) return;
         setRecentRegisteredAlumni(alumni);
       } catch (error) {
         console.error("Failed to load recently registered alumni:", error);
-
         if (!mounted) return;
         setRecentRegisteredAlumni([]);
       } finally {
         if (mounted) setRecentRegisteredAlumniLoading(false);
       }
     }
-
     run();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
     let mounted = true;
-
     async function run() {
       try {
         setSurveysLoading(true);
-        setEngagementError("");
-
+        setSurveyOverviewError("");
         const surveys = await loadAvailableSurveys();
-
         if (!mounted) return;
-
         setAvailableSurveys(surveys);
-        setSelectedSurveyId((current) => current || surveys?.[0]?.id || "");
       } catch (error) {
         console.error("Failed to load available surveys:", error);
-
         if (!mounted) return;
         setAvailableSurveys([]);
-        setSelectedSurveyId("");
-        setEngagementError(error?.message || "Failed to load available surveys.");
+        setSurveyOverviewError(error?.message || "Failed to load available surveys.");
       } finally {
         if (mounted) setSurveysLoading(false);
       }
     }
-
     run();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
     let mounted = true;
-
     async function run() {
       try {
         setAverageProfileCompletionLoading(true);
-
         const nextAverage = await loadAverageAlumniProfileCompletion();
-
         if (!mounted) return;
         setAverageProfileCompletion(nextAverage);
       } catch (error) {
         console.error("Failed to load average alumni profile completion:", error);
-
         if (!mounted) return;
-        setAverageProfileCompletion({
-          average: 0,
-          totalAlumni: 0,
-        });
+        setAverageProfileCompletion({ average: 0, totalAlumni: 0 });
       } finally {
         if (mounted) setAverageProfileCompletionLoading(false);
       }
     }
-
     run();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
     let mounted = true;
-
     async function run() {
       try {
         setCalendarEventsLoading(true);
-
         const events = await loadCalendarEvents();
-
         if (!mounted) return;
         setCalendarEvents(events);
       } catch (error) {
         console.error("Failed to load calendar events:", error);
-
         if (!mounted) return;
         setCalendarEvents([]);
       } finally {
         if (mounted) setCalendarEventsLoading(false);
       }
     }
-
     run();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
     let mounted = true;
-
     async function run() {
       try {
         setRecentPostsLoading(true);
@@ -2410,17 +2194,12 @@ export default function OfficerDashboardPage() {
         if (mounted) setRecentPostsLoading(false);
       }
     }
-
     run();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
     let mounted = true;
-
     async function run() {
       try {
         setRecentPerksLoading(true);
@@ -2435,221 +2214,127 @@ export default function OfficerDashboardPage() {
         if (mounted) setRecentPerksLoading(false);
       }
     }
-
     run();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
     let mounted = true;
-
     async function run() {
       try {
         setMonthlyPostingActivityLoading(true);
-
         const activity = await loadMonthlyPostingActivity({
           type: monthlyPostingType,
           year: monthlyPostingYear,
         });
-
         if (!mounted) return;
         setMonthlyPostingActivity(activity);
       } catch (error) {
         console.error("Failed to load monthly posting activity:", error);
-
         if (!mounted) return;
         setMonthlyPostingActivity([]);
       } finally {
         if (mounted) setMonthlyPostingActivityLoading(false);
       }
     }
-
     run();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [monthlyPostingType, monthlyPostingYear]);
 
   useEffect(() => {
     let mounted = true;
-
     async function run() {
       try {
         setMostPostedCategoryLoading(true);
-
         const categories = await loadMostPostedCategory({
           type: mostPostedCategoryType,
           year: mostPostedCategoryYear,
         });
-
         if (!mounted) return;
         setMostPostedCategory(categories);
       } catch (error) {
         console.error("Failed to load most posted category:", error);
-
         if (!mounted) return;
         setMostPostedCategory([]);
       } finally {
         if (mounted) setMostPostedCategoryLoading(false);
       }
     }
-
     run();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [mostPostedCategoryType, mostPostedCategoryYear]);
 
   useEffect(() => {
     let mounted = true;
-
     async function run() {
-      const registeredAlumniCount = Number(dashboardCounts.registeredAlumni || 0);
-
-      if (!selectedSurveyId) {
-        setSurveyEngagement({
-          ...SURVEY_ENGAGEMENT_INITIAL,
-          totalEligibleAlumni: registeredAlumniCount,
-          notAnsweredCount: registeredAlumniCount,
-        });
-        return;
-      }
+      if (surveysLoading) return;
 
       try {
-        setEngagementLoading(true);
-        setEngagementError("");
-
-        const nextEngagement = await loadSurveyEngagement(
-          selectedSurveyId,
-          registeredAlumniCount,
-        );
-
+        setSurveyOverviewLoading(true);
+        setSurveyOverviewError("");
+        const nextOverview = await loadSurveyOverview(availableSurveys);
         if (!mounted) return;
-        setSurveyEngagement(nextEngagement);
+        setSurveyOverview(nextOverview);
       } catch (error) {
-        console.error("Failed to load survey engagement:", error);
-
+        console.error("Failed to load survey overview:", error);
         if (!mounted) return;
-        setSurveyEngagement({
-          ...SURVEY_ENGAGEMENT_INITIAL,
-          totalEligibleAlumni: registeredAlumniCount,
-          notAnsweredCount: registeredAlumniCount,
-        });
-        setEngagementError(error?.message || "Failed to load survey engagement.");
+        setSurveyOverview(SURVEY_OVERVIEW_INITIAL);
+        setSurveyOverviewError(error?.message || "Failed to load survey overview.");
       } finally {
-        if (mounted) setEngagementLoading(false);
+        if (mounted) setSurveyOverviewLoading(false);
       }
     }
-
-    if (!countsLoading) run();
-
-    return () => {
-      mounted = false;
-    };
-  }, [countsLoading, dashboardCounts.registeredAlumni, selectedSurveyId]);
+    run();
+    return () => { mounted = false; };
+  }, [availableSurveys, surveysLoading]);
 
   return (
-    <div className="animate-fadeIn space-y-6">
-      <Card className="overflow-hidden border-border/60 border-l-4 border-l-[#3D398C] shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-bold text-foreground">
-            {greeting}, <span className="text-[#3D398C]">{userEmail}</span>
-          </CardTitle>
-          <CardDescription className="text-sm">
-            Welcome to the Alumni Affairs Office Dashboard.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+    <div className="space-y-5 font-[Poppins]">
+      <DashboardHeader />
 
       {countsError ? (
-        <Card className="border-red-200 bg-red-50 shadow-sm">
-          <CardContent className="pt-5 text-sm font-medium text-red-700">
-            {countsError}
-          </CardContent>
-        </Card>
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+          {countsError}
+        </div>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <DashboardMetricCard
-          icon={Users}
+      {/* Metric cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <MetricCard
           label="Alumni"
           value={dashboardCounts.totalAlumni}
-          color={DASHBOARD_COLORS.alumni}
           loading={countsLoading}
-          onViewDetails={() => navigate("/alumni-officer/alumni/manage")}
+          onClick={() => navigate("/alumni-officer/alumni/manage")}
         />
-
-        <DashboardMetricCard
-          icon={Megaphone}
+        <MetricCard
           label="Posts"
           value={dashboardCounts.totalPosts}
-          color={DASHBOARD_COLORS.posts}
           loading={countsLoading}
-          onViewDetails={() => navigate("/alumni-officer/posts")}
+          onClick={() => navigate("/alumni-officer/posts")}
         />
-
-        <DashboardMetricCard
-          icon={PieChartIcon}
+        <MetricCard
           label="Surveys"
           value={dashboardCounts.totalSurveys}
-          color={DASHBOARD_COLORS.surveys}
           loading={countsLoading}
-          onViewDetails={() => navigate("/alumni-officer/surveys")}
+          onClick={() => navigate("/alumni-officer/surveys")}
         />
-
-        <DashboardMetricCard
-          icon={Tag}
-          label="Perks & Discounts"
+        <MetricCard
+          label="Perks"
           value={dashboardCounts.totalPerksDiscounts}
-          color={DASHBOARD_COLORS.perks}
           loading={countsLoading}
-          onViewDetails={() => navigate("/alumni-officer/perks-discounts")}
+          onClick={() => navigate("/alumni-officer/perks-discounts")}
         />
-
-        <DashboardMetricCard
-          icon={CalendarDays}
-          label="Calendar Events"
+        <MetricCard
+          label="Events"
           value={dashboardCounts.totalCalendarEvents}
-          color={DASHBOARD_COLORS.calendar}
           loading={countsLoading}
-          onViewDetails={() => navigate("/alumni-officer/calendar")}
+          onClick={() => navigate("/alumni-officer/calendar")}
         />
       </div>
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(380px,0.85fr)]">
-        <div className="space-y-4">
-          <RecentlyRegisteredAlumniCard
-            alumni={recentRegisteredAlumni}
-            loading={recentRegisteredAlumniLoading}
-            onViewAll={() => navigate("/alumni-officer/alumni/manage")}
-          />
-
-          <AlumniRegistrationOverviewCard
-            counts={dashboardCounts}
-            loading={countsLoading}
-          />
-
-          <AverageAlumniProfileCompletionCard
-            value={averageProfileCompletion.average}
-            totalAlumni={averageProfileCompletion.totalAlumni}
-            loading={averageProfileCompletionLoading}
-          />
-
-          <SurveyEngagementCard
-            surveys={availableSurveys}
-            selectedSurveyId={selectedSurveyId}
-            setSelectedSurveyId={setSelectedSurveyId}
-            engagement={surveyEngagement}
-            loadingSurveys={surveysLoading}
-            loadingEngagement={engagementLoading}
-            error={engagementError}
-          />
-
+      {/* Top section: 80/20 split — charts stacked on left, calendar on right */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
+        <div className="space-y-4 xl:col-span-4">
           <MonthlyPostingActivityCard
             data={monthlyPostingActivity}
             loading={monthlyPostingActivityLoading}
@@ -2671,54 +2356,46 @@ export default function OfficerDashboardPage() {
           />
         </div>
 
-        <div className="space-y-4">
-          <MiniCalendarEventsCard
+        <div className="space-y-4 xl:col-span-1">
+          <MiniCalendarCard
             events={calendarEvents}
-            loading={calendarEventsLoading}
             onViewAll={() => navigate("/alumni-officer/calendar")}
           />
-
-          <RecentListCard
-            icon={CalendarDays}
-            color={DASHBOARD_COLORS.calendar}
-            title="Recent Events"
-            description="Upcoming or recently scheduled alumni events."
-            items={recentEvents}
-            loading={calendarEventsLoading}
-            emptyText="No recent events found."
-            getTitle={getEventTitle}
-            getDate={(event) =>
-              event.parsedDate || event.eventDate || event.startDate || event.date
-            }
-            onViewAll={() => navigate("/alumni-officer/calendar")}
-          />
-
-          <RecentListCard
-            icon={Megaphone}
-            color={DASHBOARD_COLORS.posts}
-            title="Recent Posts"
-            description="Latest alumni announcements and news posts."
-            items={recentPosts}
-            loading={recentPostsLoading}
-            emptyText="No recent posts found."
-            getTitle={getPostTitle}
-            getDate={(post) => post.createdAt || post.publishedAt || post.updatedAt}
-            onViewAll={() => navigate("/alumni-officer/posts")}
-          />
-
-          <RecentListCard
-            icon={Tag}
-            color={DASHBOARD_COLORS.perks}
-            title="Recent Perks & Discounts"
-            description="Newest alumni partner perks and discount offers."
-            items={recentPerks}
-            loading={recentPerksLoading}
-            emptyText="No recent perks or discounts found."
-            getTitle={getPerkTitle}
-            getDate={(perk) => perk.createdAt || perk.publishedAt || perk.updatedAt}
-            onViewAll={() => navigate("/alumni-officer/perks-discounts")}
+          <RecentActivityCard
+            alumni={recentRegisteredAlumni}
+            alumniLoading={recentRegisteredAlumniLoading}
+            posts={recentPosts}
+            postsLoading={recentPostsLoading}
+            events={calendarEvents}
+            eventsLoading={calendarEventsLoading}
+            perks={recentPerks}
+            perksLoading={recentPerksLoading}
+            onViewAlumni={() => navigate("/alumni-officer/alumni/manage")}
+            onViewPosts={() => navigate("/alumni-officer/posts")}
+            onViewEvents={() => navigate("/alumni-officer/calendar")}
+            onViewPerks={() => navigate("/alumni-officer/perks-discounts")}
           />
         </div>
+      </div>
+
+      {/* Bottom section: analytics cards */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <AlumniRegistrationCard counts={dashboardCounts} loading={countsLoading} />
+
+        <SurveyEngagementCard
+          surveys={availableSurveys}
+          overview={surveyOverview}
+          loadingSurveys={surveysLoading}
+          loadingOverview={surveyOverviewLoading}
+          error={surveyOverviewError}
+        />
+
+        <ProfileCompletionCard
+          value={averageProfileCompletion.average}
+          totalAlumni={averageProfileCompletion.totalAlumni}
+          loading={averageProfileCompletionLoading}
+        />
+
       </div>
     </div>
   );

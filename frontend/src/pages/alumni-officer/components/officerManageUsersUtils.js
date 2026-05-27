@@ -205,6 +205,26 @@ export function normalizePreRegisteredAlumni(row = {}) {
   };
 }
 
+
+export function normalizeTransitioningAlumni(row = {}) {
+  const normalized = normalizePreRegisteredAlumni(row);
+
+  return {
+    ...normalized,
+    sourceType: "transitioning",
+    status:
+      row.status ||
+      row.transition_status ||
+      row.transitionStatus ||
+      "transitioning",
+    transitionStatus:
+      row.transition_status ||
+      row.transitionStatus ||
+      row.status ||
+      "pending",
+  };
+}
+
 export function formatDate(value) {
   if (!value) return "—";
   const date = new Date(value);
@@ -223,6 +243,9 @@ export function displayStatus(value) {
   const status = norm(value);
   if (status === "active") return "Active";
   if (status === "pre-registered" || status === "preregistered") return "Pre-Registered";
+  if (status === "transitioning" || status === "pending-transition" || status === "pending") {
+    return "Transitioning";
+  }
   return "Deactivated";
 }
 
@@ -494,5 +517,14 @@ export function buildPreRegisteredAlumniPayload(row) {
     role: "alumni",
     status: "pre-registered",
     claimed: false,
+  };
+}
+
+
+export function buildTransitioningAlumniPayload(row) {
+  return {
+    ...buildPreRegisteredAlumniPayload(row),
+    status: "transitioning",
+    transition_status: "pending",
   };
 }

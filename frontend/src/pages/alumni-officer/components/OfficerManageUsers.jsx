@@ -9,6 +9,7 @@ import {
   Eye,
   FileSpreadsheet,
   Filter,
+  SlidersHorizontal,
   GraduationCap,
   Loader2,
   RotateCcw,
@@ -40,6 +41,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import {
   AlumniQuickViewModal,
@@ -52,6 +54,7 @@ import {
   PS_DEFAULT,
   PS_OPTIONS,
   buildPreRegisteredAlumniPayload,
+  buildTransitioningAlumniPayload,
   displayStatus,
   getAlumniName,
   getFileDuplicateSummary,
@@ -59,6 +62,7 @@ import {
   normalizeAlumni,
   normalizeListResponse,
   normalizePreRegisteredAlumni,
+  normalizeTransitioningAlumni,
   parseBulkAlumniFile,
   safe,
   validateBulkImportRow,
@@ -110,9 +114,11 @@ function duplicateSetsFromRows(rows = []) {
 export default function OfficerManageUsers() {
   const navigate = useNavigate();
   const preRegistrationUploadInputRef = useRef(null);
+  const transitionUploadInputRef = useRef(null);
 
   const [registeredRows, setRegisteredRows] = useState([]);
   const [preRegisteredRows, setPreRegisteredRows] = useState([]);
+  const [transitionRows, setTransitionRows] = useState([]);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [bulkUploading, setBulkUploading] = useState(false);
@@ -129,6 +135,7 @@ export default function OfficerManageUsers() {
   const [bulkFileName, setBulkFileName] = useState("");
   const [bulkRows, setBulkRows] = useState([]);
   const [bulkReviewOpen, setBulkReviewOpen] = useState(false);
+  const [bulkMode, setBulkMode] = useState("pre-registration");
 
   const [bulkSummary, setBulkSummary] = useState({
     open: false,
@@ -143,15 +150,17 @@ export default function OfficerManageUsers() {
   });
 
   const isRegisteredSource = sourceFilter === "registered";
+  const isTransitioningSource = sourceFilter === "transitioning";
 
   const loadRows = useCallback(async () => {
     setLoading(true);
     setErr("");
 
     try {
-      const [alumniResult, preRegisteredResult] = await Promise.allSettled([
+      const [alumniResult, preRegisteredResult, transitioningResult] = await Promise.allSettled([
         apiRequest("/alumni/"),
         apiRequest("/pre-registered-alumni/"),
+        apiRequest("/transitioning-alumni/"),
       ]);
 
       if (alumniResult.status === "rejected") {
@@ -163,16 +172,32 @@ export default function OfficerManageUsers() {
         preRegisteredResult.status === "fulfilled"
           ? normalizeListResponse(preRegisteredResult.value).map(normalizePreRegisteredAlumni)
           : [];
+      const transitioningList =
+        transitioningResult.status === "fulfilled"
+          ? normalizeListResponse(transitioningResult.value).map(normalizeTransitioningAlumni)
+          : [];
 
       setRegisteredRows(registeredList);
       setPreRegisteredRows(preRegisteredList);
-      setRows(sourceFilter === "registered" ? registeredList : preRegisteredList);
+      setTransitionRows(transitioningList);
+
+      if (sourceFilter === "registered") setRows(registeredList);
+      else if (sourceFilter === "transitioning") setRows(transitioningList);
+      else setRows(preRegisteredList);
+
       setCurrentPage(1);
 
       if (preRegisteredResult.status === "rejected") {
         toast.warning("Pre-registered alumni endpoint is not available", {
           description:
             "Registered alumni loaded, but /api/pre-registered-alumni/ could not be reached.",
+        });
+      }
+
+      if (transitioningResult.status === "rejected") {
+        toast.warning("Transitioning alumni endpoint is not available", {
+          description:
+            "Registered alumni loaded, but /api/transitioning-alumni/ could not be reached.",
         });
       }
     } catch (error) {
@@ -193,10 +218,13 @@ export default function OfficerManageUsers() {
   }, [loadRows]);
 
   useEffect(() => {
-    setRows(sourceFilter === "registered" ? registeredRows : preRegisteredRows);
+    if (sourceFilter === "registered") setRows(registeredRows);
+    else if (sourceFilter === "transitioning") setRows(transitionRows);
+    else setRows(preRegisteredRows);
+
     setSelected(null);
     setCurrentPage(1);
-  }, [sourceFilter, registeredRows, preRegisteredRows]);
+  }, [sourceFilter, registeredRows, preRegisteredRows, transitionRows]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -279,6 +307,7 @@ export default function OfficerManageUsers() {
     const fileDuplicateRowKeys = getFileDuplicateSummary(parsedRows);
     const existingRegistered = duplicateSetsFromRows(registeredRows);
     const existingPreRegistered = duplicateSetsFromRows(preRegisteredRows);
+    const existingTransitioning = duplicateSetsFromRows(transitionRows);
 
     return parsedRows.map((row) => {
       const errors = validateBulkImportRow(row);
@@ -298,12 +327,20 @@ export default function OfficerManageUsers() {
         duplicateReasons.push("Student ID already exists in pre-registered alumni");
       }
 
+      if (rowStudentId && existingTransitioning.studentIds.has(rowStudentId)) {
+        duplicateReasons.push("Student ID already exists in transitioning alumni");
+      }
+
       if (rowEmail && existingRegistered.emails.has(rowEmail)) {
         duplicateReasons.push("NU Email already exists in registered alumni");
       }
 
       if (rowEmail && existingPreRegistered.emails.has(rowEmail)) {
         duplicateReasons.push("NU Email already exists in pre-registered alumni");
+      }
+
+      if (rowEmail && existingTransitioning.emails.has(rowEmail)) {
+        duplicateReasons.push("NU Email already exists in transitioning alumni");
       }
 
       return {
@@ -338,6 +375,7 @@ export default function OfficerManageUsers() {
     setBulkFileName(fileName);
     setBulkRows([]);
     setBulkReviewOpen(false);
+    setBulkMode("pre-registration");
 
     try {
       const parsedRows = await parseBulkAlumniFile(file);
@@ -358,6 +396,60 @@ export default function OfficerManageUsers() {
       });
     } catch (error) {
       toast.error("Bulk upload failed", {
+        description:
+          error?.message ||
+          "Something went wrong while reading the selected file.",
+      });
+    } finally {
+      setBulkUploading(false);
+    }
+  }
+
+  async function handleTransitionUpload(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    const fileName = file.name || "";
+    const lowerFileName = fileName.toLowerCase();
+    const isAcceptedFile =
+      lowerFileName.endsWith(".csv") ||
+      lowerFileName.endsWith(".xlsx") ||
+      lowerFileName.endsWith(".xls");
+
+    if (!isAcceptedFile) {
+      toast.error("Invalid file type", {
+        description: "Please upload a CSV, XLS, or XLSX file.",
+      });
+      return;
+    }
+
+    setBulkUploading(true);
+    setBulkFileName(fileName);
+    setBulkRows([]);
+    setBulkReviewOpen(false);
+    setBulkMode("transition");
+
+    try {
+      const parsedRows = await parseBulkAlumniFile(file);
+
+      if (!parsedRows.length) {
+        toast.error("No usable rows found", {
+          description: "The selected file does not contain valid alumni rows for transition.",
+        });
+        return;
+      }
+
+      const rowsWithStatus = buildBulkRowStatus(parsedRows);
+      setBulkRows(rowsWithStatus);
+      setBulkReviewOpen(true);
+
+      toast.success("File parsed successfully", {
+        description: `${rowsWithStatus.length} row(s) ready for review.`,
+      });
+    } catch (error) {
+      toast.error("Transition upload failed", {
         description:
           error?.message ||
           "Something went wrong while reading the selected file.",
@@ -404,9 +496,19 @@ export default function OfficerManageUsers() {
     try {
       for (const row of uploadableRows) {
         try {
-          await apiRequest("/pre-registered-alumni/", {
+          const endpoint =
+            bulkMode === "transition"
+              ? "/transitioning-alumni/"
+              : "/pre-registered-alumni/";
+
+          const payload =
+            bulkMode === "transition"
+              ? buildTransitioningAlumniPayload(row)
+              : buildPreRegisteredAlumniPayload(row);
+
+          await apiRequest(endpoint, {
             method: "POST",
-            body: JSON.stringify(buildPreRegisteredAlumniPayload(row)),
+            body: JSON.stringify(payload),
           });
           uploadedCount += 1;
         } catch (error) {
@@ -439,7 +541,7 @@ export default function OfficerManageUsers() {
       });
 
       await loadRows();
-      setSourceFilter("unregistered");
+      setSourceFilter(bulkMode === "transition" ? "transitioning" : "unregistered");
     } catch (error) {
       toast.error("Bulk upload failed", {
         description:
@@ -451,83 +553,88 @@ export default function OfficerManageUsers() {
     }
   }
 
-  const selectTriggerCls =
-    "h-9 w-full bg-background border border-input rounded-md shadow-sm text-sm transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20";
-  const selectItemCls = "cursor-pointer";
-  const selectContentCls =
-    "z-[80] w-[var(--radix-select-trigger-width)] min-w-[var(--radix-select-trigger-width)] overflow-hidden [&_[data-radix-select-viewport]]:max-h-[11rem] [&_[data-radix-select-viewport]]:overflow-y-auto [&_[data-radix-select-viewport]]:pr-1";
+  const sourceLabel = isTransitioningSource
+    ? "Total Transitioning"
+    : isRegisteredSource
+      ? "Total Alumni"
+      : "Total Pre-Registered";
 
+  const sourceDescription = isTransitioningSource
+    ? "Intern accounts flagged for Alumni transition"
+    : isRegisteredSource
+      ? "All registered alumni in the Django system"
+      : "Pre-registered alumni records";
+
+  const selectTriggerCls =
+    "h-8 w-full rounded-md border-border bg-background text-xs shadow-none focus:ring-1 focus:ring-[#3D398C]/25";
+  const selectItemCls =
+    "cursor-pointer items-start whitespace-normal break-words py-2 pr-8 text-xs leading-snug *:[span]:last:whitespace-normal *:[span]:last:break-words *:[span]:last:leading-snug";
+  const selectContentCls =
+    "z-[80] w-[320px] max-w-[calc(100vw-2rem)] min-w-[var(--radix-select-trigger-width)] overflow-hidden border border-border bg-popover text-popover-foreground shadow-xl [&_[data-radix-select-viewport]]:max-h-[14rem] [&_[data-radix-select-viewport]]:overflow-y-auto [&_[data-radix-select-viewport]]:pr-1";
   return (
-    <div className="space-y-2 animate-fadeIn">
+    <div className="space-y-5">
       {err ? (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-sm text-destructive">
+        <div className="animate-in fade-in-50 slide-in-from-top-1 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-sm text-destructive duration-200">
           {err}
         </div>
       ) : null}
 
       {!loading ? (
-        <div className="grid gap-3 md:grid-cols-4">
-          <div className="group rounded-xl border border-border bg-card px-5 py-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#3D398C]/20 hover:shadow-md">
+        <div className={`grid gap-3 ${isRegisteredSource ? "md:grid-cols-3" : "max-w-xs grid-cols-1"}`}>
+          <div className="group cursor-default rounded-xl border border-border bg-card px-5 py-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#3D398C]/20 hover:shadow-md">
             <div className="flex items-center gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#3D398C]/10">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#3D398C]/10 transition-colors duration-200 group-hover:bg-[#3D398C]/15">
                 <Users className="h-5 w-5" style={{ color: BB }} />
               </div>
-              <div>
-                <p className="text-xl font-bold" style={{ color: BB }}>
-                  {registeredRows.length}
+              <div className="space-y-0.5">
+                <p className="text-xl font-bold leading-tight tracking-tight" style={{ color: BB }}>
+                  {totalRecords}
                 </p>
-                <p className="text-xs font-semibold text-foreground/80">Registered Alumni</p>
-                <p className="text-[10px] text-muted-foreground">Active database records</p>
+                <p className="text-xs font-semibold text-foreground/80">{sourceLabel}</p>
+                <p className="text-[10px] text-muted-foreground">{sourceDescription}</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 shadow-sm">
-            <div className="flex items-center gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100">
-                <FileSpreadsheet className="h-5 w-5 text-blue-600" />
+          {isRegisteredSource ? (
+            <>
+              <div className="group cursor-default rounded-xl border border-border bg-card px-5 py-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 transition-colors duration-200 group-hover:bg-emerald-100">
+                    <UserCheck className="h-5 w-5 text-emerald-600" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-xl font-bold leading-tight tracking-tight text-emerald-700">{activeCount}</p>
+                    <p className="text-xs font-semibold text-foreground/80">Active</p>
+                    <p className="text-[10px] text-muted-foreground">Currently active alumni accounts</p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="text-xl font-bold text-blue-700">{preRegisteredCount}</p>
-                <p className="text-xs font-semibold text-blue-800">Pre-Registered</p>
-                <p className="text-[10px] text-blue-700/80">Bulk uploaded records</p>
-              </div>
-            </div>
-          </div>
 
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 shadow-sm">
-            <div className="flex items-center gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100">
-                <UserCheck className="h-5 w-5 text-emerald-600" />
+              <div className="group cursor-default rounded-xl border border-border bg-card px-5 py-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-red-200 hover:shadow-md">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50 transition-colors duration-200 group-hover:bg-red-100">
+                    <UserX className="h-5 w-5 text-red-500" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-xl font-bold leading-tight tracking-tight text-red-600">{inactiveCount}</p>
+                    <p className="text-xs font-semibold text-foreground/80">Deactivated</p>
+                    <p className="text-[10px] text-muted-foreground">Inactive alumni accounts</p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="text-xl font-bold text-emerald-700">{activeCount}</p>
-                <p className="text-xs font-semibold text-emerald-800">Active</p>
-                <p className="text-[10px] text-emerald-700/80">Active alumni accounts</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 shadow-sm">
-            <div className="flex items-center gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100">
-                <UserX className="h-5 w-5 text-red-500" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-red-600">{inactiveCount}</p>
-                <p className="text-xs font-semibold text-red-800">Deactivated</p>
-                <p className="text-[10px] text-red-700/80">Inactive alumni accounts</p>
-              </div>
-            </div>
-          </div>
+            </>
+          ) : null}
         </div>
       ) : null}
 
-      <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
-        <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-2">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-foreground/80">Filters</p>
-            <p className="text-[11px] text-muted-foreground">Narrow alumni records by source, status, course, or search text.</p>
+      <div className="space-y-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold tracking-tight text-foreground">Alumni Records</h2>
+            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
+              Manage registered, pre-registered, and transitioning alumni records.
+            </p>
           </div>
 
           {hasActiveFilters ? (
@@ -537,14 +644,14 @@ export default function OfficerManageUsers() {
           ) : null}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="max-w-sm min-w-[200px] flex-1">
+        <div className="flex flex-col gap-3">
+          <div className="max-w-sm min-w-[240px] flex-1">
             <Label className="mb-1 block text-[11px] font-medium text-muted-foreground">Search</Label>
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search by name, email, student ID, course, or year..."
-                className="h-9 bg-background pl-8 pr-8 text-sm"
+                className="h-8 rounded-md border-border bg-background pl-8 pr-8 text-xs shadow-none focus-visible:ring-1 focus-visible:ring-[#3D398C]/25"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
@@ -561,33 +668,40 @@ export default function OfficerManageUsers() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-end gap-2.5">
-          <div className="max-w-[180px] min-w-[140px] flex-1">
+        <div className="flex flex-wrap items-end gap-2.5 border-b border-border/60 pb-3">
+          <div>
             <Label className="mb-1 block text-[11px] font-medium text-muted-foreground">Source</Label>
-            <Select value={sourceFilter} onValueChange={setSourceFilter}>
-              <SelectTrigger className={selectTriggerCls}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent position="popper" side="bottom" align="start" sideOffset={0} avoidCollisions={false} className={selectContentCls}>
-                <SelectItem value="registered" className={selectItemCls}>Registered</SelectItem>
-                <SelectItem value="unregistered" className={selectItemCls}>Pre-Registered</SelectItem>
-              </SelectContent>
-            </Select>
+            <Tabs value={sourceFilter} onValueChange={setSourceFilter}>
+              <TabsList className="h-auto min-h-8 flex-wrap rounded-md bg-muted p-1 group-data-horizontal/tabs:h-auto">
+                <TabsTrigger value="registered" className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white">
+                  Registered
+                </TabsTrigger>
+                <TabsTrigger value="unregistered" className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white">
+                  Pre-Registered
+                </TabsTrigger>
+                <TabsTrigger value="transitioning" className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white">
+                  Transitioning
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
 
           {isRegisteredSource ? (
-            <div className="max-w-[170px] min-w-[130px] flex-1">
+            <div>
               <Label className="mb-1 block text-[11px] font-medium text-muted-foreground">Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className={selectTriggerCls}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent position="popper" side="bottom" align="start" sideOffset={0} avoidCollisions={false} className={selectContentCls}>
-                  <SelectItem value="all" className={selectItemCls}>All Status</SelectItem>
-                  <SelectItem value="active" className={selectItemCls}>Active</SelectItem>
-                  <SelectItem value="deactivated" className={selectItemCls}>Deactivated</SelectItem>
-                </SelectContent>
-              </Select>
+              <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+                <TabsList className="h-auto min-h-8 flex-wrap rounded-md bg-muted p-1 group-data-horizontal/tabs:h-auto">
+                  <TabsTrigger value="all" className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white">
+                    All Status
+                  </TabsTrigger>
+                  <TabsTrigger value="active" className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white">
+                    Active
+                  </TabsTrigger>
+                  <TabsTrigger value="deactivated" className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white">
+                    Deactivated
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
           ) : null}
 
@@ -595,7 +709,7 @@ export default function OfficerManageUsers() {
             <Label className="mb-1 block text-[11px] font-medium text-muted-foreground">Course</Label>
             <Select value={courseFilter} onValueChange={setCourseFilter}>
               <SelectTrigger className={selectTriggerCls}>
-                <SelectValue />
+                <SelectValue placeholder="All Courses" />
               </SelectTrigger>
               <SelectContent position="popper" side="bottom" align="start" sideOffset={0} avoidCollisions={false} className={selectContentCls}>
                 <SelectItem value="all" className={selectItemCls}>All Courses</SelectItem>
@@ -621,63 +735,60 @@ export default function OfficerManageUsers() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-foreground/80">Bulk Upload & Export</p>
-            <p className="text-[11px] text-muted-foreground">Bulk upload alumni pre-registration spreadsheets or refresh records.</p>
-          </div>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold text-foreground">Bulk Upload & Export</p>
+          <p className="text-[11px] text-muted-foreground">
+            Upload transition or pre-registration spreadsheets, open Advanced Export, or refresh records.
+          </p>
+        </div>
 
-          <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
-            <input
-              ref={preRegistrationUploadInputRef}
-              type="file"
-              accept={BULK_UPLOAD_ACCEPT}
-              className="hidden"
-              onChange={handleBulkAlumniUpload}
-            />
+        <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
+          <input ref={transitionUploadInputRef} type="file" accept={BULK_UPLOAD_ACCEPT} className="hidden" onChange={handleTransitionUpload} />
+          <input ref={preRegistrationUploadInputRef} type="file" accept={BULK_UPLOAD_ACCEPT} className="hidden" onChange={handleBulkAlumniUpload} />
 
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={bulkUploading}
-              className="h-9 gap-1.5 font-medium"
-              onClick={() => preRegistrationUploadInputRef.current?.click()}
-              title="Bulk upload Alumni pre-registration records from CSV or Excel"
-            >
-              {bulkUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-              Pre-Registration
-              <Badge variant="secondary" className="ml-1 hidden h-4 px-1.5 py-0 text-[10px] sm:inline-flex">CSV/XLSX</Badge>
-            </Button>
+          <Button type="button" variant="outline" size="sm" disabled={bulkUploading} className="h-9 gap-1.5 font-medium" onClick={() => transitionUploadInputRef.current?.click()} title="Bulk upload alumni transition records from CSV or Excel">
+            {bulkUploading && bulkMode === "transition" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+            Transition
+            <Badge variant="secondary" className="ml-1 hidden h-4 px-1.5 py-0 text-[10px] sm:inline-flex">CSV/XLSX</Badge>
+          </Button>
 
-            <Button variant="outline" size="sm" className="h-9 gap-1.5 font-medium" disabled={loading} onClick={loadRows}>
-              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
-              Refresh
-            </Button>
-          </div>
+          <Button type="button" variant="outline" size="sm" disabled={bulkUploading} className="h-9 gap-1.5 font-medium" onClick={() => preRegistrationUploadInputRef.current?.click()} title="Bulk upload Alumni pre-registration records from CSV or Excel">
+            {bulkUploading && bulkMode === "pre-registration" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
+            Pre-Registration
+            <Badge variant="secondary" className="ml-1 hidden h-4 px-1.5 py-0 text-[10px] sm:inline-flex">CSV/XLSX</Badge>
+          </Button>
+
+          <Button type="button" variant="outline" size="sm" className="h-9 gap-1.5 font-medium" onClick={() => navigate("/alumni-officer/alumni/manage/advanced")} title="Open Advanced Export">
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            Advanced Export
+          </Button>
+
+          <Button variant="outline" size="sm" className="h-9 gap-1.5 font-medium" disabled={loading} onClick={loadRows}>
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+            Refresh
+          </Button>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+      <div className="overflow-hidden border-t border-border/60">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="border-b border-border bg-muted/40 hover:bg-transparent">
-                <TableHead className="min-w-[190px] px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Name</TableHead>
-                <TableHead className="min-w-[200px] px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">NU Email</TableHead>
-                <TableHead className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Student ID</TableHead>
-                <TableHead className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Course</TableHead>
-                <TableHead className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Graduation</TableHead>
-                <TableHead className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Status</TableHead>
-                <TableHead className="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Action</TableHead>
+              <TableRow className="border-b border-border/50 bg-transparent hover:bg-transparent">
+                <TableHead className="min-w-[260px] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Alumni</TableHead>
+                <TableHead className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Student ID</TableHead>
+                <TableHead className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Program</TableHead>
+                <TableHead className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Graduation</TableHead>
+                <TableHead className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Status</TableHead>
+                <TableHead className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Actions</TableHead>
               </TableRow>
             </TableHeader>
 
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-40 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-40 text-center text-muted-foreground">
                     <div className="flex flex-col items-center gap-3">
                       <div className="h-5 w-5 animate-spin rounded-full border-2 border-muted-foreground/20 border-t-[#3D398C]" />
                       <div className="space-y-1">
@@ -689,7 +800,7 @@ export default function OfficerManageUsers() {
                 </TableRow>
               ) : paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-40 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-40 text-center text-muted-foreground">
                     <div className="flex flex-col items-center gap-2">
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
                         <Search className="h-5 w-5 text-muted-foreground/40" />
@@ -714,52 +825,40 @@ export default function OfficerManageUsers() {
                 paginated.map((row) => {
                   const isActive = norm(row.status) === "active";
                   const isPreRegistered = row.sourceType === "unregistered";
+                  const isTransitioning = row.sourceType === "transitioning";
 
                   return (
-                    <TableRow
-                      key={makeKey(row)}
-                      className="cursor-pointer transition-colors duration-150 hover:bg-muted/40"
-                      onClick={() => setSelected(row)}
-                    >
-                      <TableCell className="px-3 py-2">
-                        <span className="block max-w-[220px] truncate text-[13px] font-semibold text-foreground">{getAlumniName(row)}</span>
+                    <TableRow key={makeKey(row)} className="cursor-pointer border-b border-border/60 transition-colors duration-150 hover:bg-muted/30" onClick={() => setSelected(row)}>
+                      <TableCell className="px-3 py-2.5">
+                        <span className="block max-w-[260px] truncate text-xs font-semibold text-foreground">{getAlumniName(row)}</span>
+                        <span className="block max-w-[260px] truncate text-[11px] text-muted-foreground">{row.email || "—"}</span>
                       </TableCell>
-                      <TableCell className="px-3 py-2">
-                        <span className="block max-w-[230px] truncate text-xs text-muted-foreground">{row.email || "—"}</span>
+                      <TableCell className="px-3 py-2.5 text-xs tabular-nums text-muted-foreground">{row.studentId || "—"}</TableCell>
+                      <TableCell className="px-3 py-2.5">
+                        <span className="block max-w-[180px] truncate text-xs font-semibold text-foreground">{row.course || "—"}</span>
+                        <span className="block max-w-[180px] truncate text-[10px] font-medium text-muted-foreground">{row.courseFullName || "—"}</span>
                       </TableCell>
-                      <TableCell className="px-3 py-2 text-xs tabular-nums text-muted-foreground">{row.studentId || "—"}</TableCell>
-                      <TableCell className="px-3 py-2">
-                        <div className="flex items-center gap-1.5">
-                          <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="block max-w-[160px] truncate text-xs font-semibold text-foreground">{row.course || "—"}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-3 py-2 text-xs text-muted-foreground">{row.graduationYear || "—"}</TableCell>
-                      <TableCell className="px-3 py-2">
+                      <TableCell className="px-3 py-2.5 text-xs tabular-nums text-muted-foreground">{row.graduationYear || "—"}</TableCell>
+                      <TableCell className="px-3 py-2.5">
                         <Badge
                           variant="outline"
                           className={
-                            isPreRegistered
-                              ? "h-5 gap-1 border-blue-200 bg-blue-50 px-1.5 py-0 text-[10px] font-medium text-blue-700"
-                              : isActive
-                                ? "h-5 gap-1 border-emerald-200 bg-emerald-50 px-1.5 py-0 text-[10px] font-medium text-emerald-700"
-                                : "h-5 gap-1 border-red-200 bg-red-50 px-1.5 py-0 text-[10px] font-medium text-red-700"
+                            isTransitioning
+                              ? "h-5 gap-1 border-amber-200 bg-amber-50 px-1.5 py-0 text-[10px] font-medium text-amber-700"
+                              : isPreRegistered
+                                ? "h-5 gap-1 border-blue-200 bg-blue-50 px-1.5 py-0 text-[10px] font-medium text-blue-700"
+                                : isActive
+                                  ? "h-5 gap-1 border-emerald-200 bg-emerald-50 px-1.5 py-0 text-[10px] font-medium text-emerald-700"
+                                  : "h-5 gap-1 border-red-200 bg-red-50 px-1.5 py-0 text-[10px] font-medium text-red-700"
                           }
                         >
                           <ShieldCheck className="h-3 w-3" />
                           {displayStatus(row.status)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="px-3 py-2 text-right" onClick={(event) => event.stopPropagation()}>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-[#3D398C]"
-                          onClick={() => openFullProfile(row)}
-                          title={isPreRegistered ? "View pre-registered alumni" : "View alumni profile"}
-                        >
-                          <Eye className="h-4 w-4" />
+                      <TableCell className="px-3 py-2.5 text-right" onClick={(event) => event.stopPropagation()}>
+                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-muted hover:text-[#3D398C]" onClick={() => openFullProfile(row)} title={isPreRegistered ? "View pre-registered alumni" : "View alumni profile"}>
+                          <Eye className="h-3.5 w-3.5" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -810,12 +909,7 @@ export default function OfficerManageUsers() {
         </div>
       </div>
 
-      <AlumniQuickViewModal
-        user={selected}
-        open={!!selected}
-        onClose={() => setSelected(null)}
-        onViewProfile={() => openFullProfile(selected)}
-      />
+      <AlumniQuickViewModal user={selected} open={!!selected} onClose={() => setSelected(null)} onViewProfile={() => openFullProfile(selected)} />
 
       <BulkUploadReviewModal
         open={bulkReviewOpen}
@@ -831,11 +925,7 @@ export default function OfficerManageUsers() {
         onContinue={handleBulkReviewContinue}
       />
 
-      <BulkUploadSummaryModal
-        open={bulkSummary.open}
-        summary={bulkSummary}
-        onClose={() => setBulkSummary((prev) => ({ ...prev, open: false }))}
-      />
+      <BulkUploadSummaryModal open={bulkSummary.open} summary={bulkSummary} onClose={() => setBulkSummary((prev) => ({ ...prev, open: false }))} />
     </div>
   );
 }
