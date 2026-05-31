@@ -1561,7 +1561,7 @@ export default function OfficerManagePerksDiscounts() {
                 <SelectTrigger className="h-8 w-[130px] rounded-md border-border bg-background text-xs shadow-none focus:ring-1 focus:ring-[#3D398C]/25">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[100] border border-gray-200 bg-white text-gray-900 shadow-lg">
                   <SelectItem value="recent">Newest</SelectItem>
                   <SelectItem value="oldest">Oldest</SelectItem>
                   <SelectItem value="title">Title</SelectItem>
@@ -1578,25 +1578,25 @@ export default function OfficerManagePerksDiscounts() {
                 <TabsList className="inline-flex h-8 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
                   <TabsTrigger
                     value="all"
-                    className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white data-[state=active]:shadow-none"
+                    className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-active:!bg-[#3D398C] data-active:!text-white data-[state=active]:!bg-[#3D398C] data-[state=active]:!text-white data-[state=active]:shadow-none"
                   >
                     All
                   </TabsTrigger>
                   <TabsTrigger
                     value="active"
-                    className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white data-[state=active]:shadow-none"
+                    className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-active:!bg-[#3D398C] data-active:!text-white data-[state=active]:!bg-[#3D398C] data-[state=active]:!text-white data-[state=active]:shadow-none"
                   >
                     Active
                   </TabsTrigger>
                   <TabsTrigger
                     value="draft"
-                    className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white data-[state=active]:shadow-none"
+                    className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-active:!bg-[#3D398C] data-active:!text-white data-[state=active]:!bg-[#3D398C] data-[state=active]:!text-white data-[state=active]:shadow-none"
                   >
                     Draft
                   </TabsTrigger>
                   <TabsTrigger
                     value="closed"
-                    className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white data-[state=active]:shadow-none"
+                    className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-active:!bg-[#3D398C] data-active:!text-white data-[state=active]:!bg-[#3D398C] data-[state=active]:!text-white data-[state=active]:shadow-none"
                   >
                     Closed
                   </TabsTrigger>
@@ -1941,7 +1941,7 @@ export default function OfficerManagePerksDiscounts() {
               <SelectTrigger className="h-8 w-[72px] rounded-md border-border bg-background text-xs shadow-none focus:ring-1 focus:ring-[#3D398C]/25">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[100] border border-gray-200 bg-white text-gray-900 shadow-lg">
                 {PS_OPTIONS.map((size) => (
                   <SelectItem key={size} value={String(size)}>
                     {size}

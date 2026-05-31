@@ -35,6 +35,16 @@ const STEP_COUNT = 4;
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 const MAX_IMAGE_COUNT = 5;
 
+function getUploadExtension(file) {
+  const name = String(file?.name || "");
+  const match = name.match(/\.[a-zA-Z0-9]+$/);
+  return match ? match[0].toLowerCase() : ".jpg";
+}
+
+function buildPostImagePath(postId, index, file) {
+  return `newsPosts/${postId}/post-image-${index + 1}${getUploadExtension(file)}`;
+}
+
 function buildNameWithMiddleInitial(personalInfo = {}) {
   const first = String(personalInfo.firstName || "").trim();
   const middle = String(personalInfo.middleName || "").trim();
@@ -1094,22 +1104,23 @@ export default function OfficerEditPost({
     try {
       const uploadedURLs = [];
 
-      for (const file of files) {
-        const safeName = `${Date.now()}-${file.name}`;
-        const path = `newsPosts/${resolvedPostId}/${safeName}`;
+      for (const [index, file] of files.entries()) {
+        const path = buildPostImagePath(resolvedPostId, index, file);
 
         const fileRef = ref(storage, path);
         await uploadBytes(fileRef, file);
 
         const url = await getDownloadURL(fileRef);
-        uploadedURLs.push(url);
+        if (url) uploadedURLs.push(url);
       }
+
+      const nextPhotoURLs = uploadedURLs.length > 0 ? uploadedURLs : existingImages;
 
       await updateDoc(doc(db, "newsPosts", resolvedPostId), {
         postHeader: cleanText(headerText),
         postContent: cleanText(contentText),
         links: getSafeLinks(links),
-        photoURLs: [...existingImages, ...uploadedURLs],
+        photoURLs: nextPhotoURLs,
         authorUid: auth.currentUser?.uid || "",
         authorEmail: auth.currentUser?.email || "",
         authorName,
@@ -1154,22 +1165,23 @@ export default function OfficerEditPost({
     try {
       const uploadedURLs = [];
 
-      for (const file of files) {
-        const safeName = `${Date.now()}-${file.name}`;
-        const path = `newsPosts/${resolvedPostId}/${safeName}`;
+      for (const [index, file] of files.entries()) {
+        const path = buildPostImagePath(resolvedPostId, index, file);
 
         const fileRef = ref(storage, path);
         await uploadBytes(fileRef, file);
 
         const url = await getDownloadURL(fileRef);
-        uploadedURLs.push(url);
+        if (url) uploadedURLs.push(url);
       }
+
+      const nextPhotoURLs = uploadedURLs.length > 0 ? uploadedURLs : existingImages;
 
       await updateDoc(doc(db, "newsPosts", resolvedPostId), {
         postHeader: cleanText(headerText),
         postContent: cleanText(contentText),
         links: getSafeLinks(links),
-        photoURLs: [...existingImages, ...uploadedURLs],
+        photoURLs: nextPhotoURLs,
         authorUid: auth.currentUser?.uid || "",
         authorEmail: auth.currentUser?.email || "",
         authorName,

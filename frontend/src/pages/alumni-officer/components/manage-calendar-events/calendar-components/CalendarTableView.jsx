@@ -664,7 +664,7 @@ export default function CalendarTableView({
                 <SelectTrigger className={selectTriggerCls}>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[100] border border-gray-200 bg-white text-gray-900 shadow-lg">
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="published">Active</SelectItem>
                   <SelectItem value="draft">Draft</SelectItem>
@@ -683,7 +683,7 @@ export default function CalendarTableView({
                 <SelectTrigger className={selectTriggerCls}>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[100] border border-gray-200 bg-white text-gray-900 shadow-lg">
                   <SelectItem value="all">All Months</SelectItem>
                   {monthOptions.map((month) => (
                     <SelectItem key={month.value} value={month.value}>
@@ -702,7 +702,7 @@ export default function CalendarTableView({
                 <SelectTrigger className={selectTriggerCls}>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[100] border border-gray-200 bg-white text-gray-900 shadow-lg">
                   <SelectItem value="all">All Years</SelectItem>
                   {yearOptions.map((year) => (
                     <SelectItem key={year} value={year}>
@@ -721,7 +721,7 @@ export default function CalendarTableView({
                 <SelectTrigger className={selectTriggerCls}>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[100] border border-gray-200 bg-white text-gray-900 shadow-lg">
                   <SelectItem value="recent">Recent</SelectItem>
                   <SelectItem value="oldest">Oldest</SelectItem>
                 </SelectContent>
@@ -1074,7 +1074,7 @@ export default function CalendarTableView({
                   <SelectTrigger className="h-7 w-[62px] text-[11px] bg-background border-input">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent align="end">
+                  <SelectContent align="end" className="z-[100] border border-gray-200 bg-white text-gray-900 shadow-lg">
                     {PAGE_SIZE_OPTIONS.map((n) => (
                       <SelectItem
                         key={n}

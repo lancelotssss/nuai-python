@@ -15,6 +15,7 @@ import {
   Search,
   ShieldAlert,
   ShieldCheck,
+  Trash2,
   Upload,
   UserCheck,
   Users,
@@ -55,6 +56,7 @@ import {
 } from "@/components/ui/table";
 
 const API_BASE_URL = "http://127.0.0.1:8000/api";
+const PRE_REGISTERED_INTERNS_ENDPOINT = "/pre-registered-interns/";
 const BB = "#3D398C";
 const PS_DEFAULT = 20;
 const PS_OPTIONS = [10, 20, 50];
@@ -128,7 +130,7 @@ function normalizeIntern(row = {}) {
   return {
     ...row,
     id: row.id,
-    sourceType: row.sourceType || "registered",
+    sourceType: "registered",
     studentId: row.student_id || row.studentId || "",
     firstName: row.first_name || row.firstName || "",
     middleName: row.middle_name || row.middleName || "",
@@ -152,6 +154,7 @@ function normalizeIntern(row = {}) {
       "",
     status: row.status || "active",
     role: row.role || "intern",
+    claimed: true,
     systemAudit: {
       ...(row.systemAudit || {}),
       isSuspended:
@@ -159,6 +162,116 @@ function normalizeIntern(row = {}) {
         norm(row.status) === "suspended" ||
         norm(row.status) === "deactivated",
     },
+  };
+}
+
+function normalizePreRegisteredIntern(row = {}) {
+  const fullName = buildFullName(row);
+  const status = row.status || (row.claimed ? "claimed" : "pre-registered");
+
+  return {
+    ...row,
+    id: row.id,
+    sourceType: "pre_registered",
+    studentId: row.student_id || row.studentId || "",
+    firstName: row.first_name || row.firstName || "",
+    middleName: row.middle_name || row.middleName || "",
+    lastName: row.last_name || row.lastName || "",
+    fullName,
+    gender: row.gender || row.personalInformation?.gender || "",
+    email:
+      row.nu_email ||
+      row.nuEmail ||
+      row.email ||
+      row.contactInformation?.nuEmail ||
+      row.contactInformation?.email ||
+      "",
+    course:
+      row.course ||
+      row.course_code ||
+      row.courseCode ||
+      row.program_code ||
+      row.programCode ||
+      row.academicRecords?.course ||
+      "",
+    courseFullName: row.course_full_name || row.courseFullName || "",
+    schoolProgramCode: row.school_program_code || row.schoolProgramCode || "",
+    schoolProgramFullName: row.school_program_full_name || row.schoolProgramFullName || "",
+    status,
+    role: row.role || "intern",
+    claimed: !!row.claimed || norm(status) === "claimed",
+    systemAudit: {
+      ...(row.systemAudit || {}),
+      isSuspended: norm(status) === "deactivated",
+    },
+  };
+}
+
+function isPreRegisteredRow(row = {}) {
+  return row.sourceType === "pre_registered";
+}
+
+function isTransitioningRow(row = {}) {
+  const status = norm(row.status);
+  return (
+    status === "transitioning" ||
+    status === "for transition" ||
+    row.alumni_transition_pending === true ||
+    row.alumniTransition?.pending === true
+  );
+}
+
+function getDisplayStatus(row = {}) {
+  if (isTransitioningRow(row)) return "Transitioning";
+
+  if (isPreRegisteredRow(row)) {
+    if (row.claimed || norm(row.status) === "claimed") return "Claimed";
+    if (norm(row.status) === "deactivated") return "Deactivated";
+    return "Pre-Registered";
+  }
+
+  return row.systemAudit?.isSuspended ? "Suspended" : "Active";
+}
+
+function getTransitionEligibility(row = {}) {
+  if (isTransitioningRow(row)) {
+    return {
+      label: "In Transition",
+      className:
+        "h-5 gap-1 border border-orange-200 bg-orange-50 px-1.5 py-0 text-[10px] font-medium text-orange-700",
+    };
+  }
+
+  if (isPreRegisteredRow(row)) {
+    if (row.claimed || norm(row.status) === "claimed") {
+      return {
+        label: "Claimed",
+        className:
+          "h-5 gap-1 border border-slate-200 bg-slate-50 px-1.5 py-0 text-[10px] font-medium text-slate-600",
+      };
+    }
+
+    if (norm(row.status) === "pre-registered") {
+      return {
+        label: "Eligible",
+        className:
+          "h-5 gap-1 border border-blue-200 bg-blue-50 px-1.5 py-0 text-[10px] font-medium text-blue-700",
+      };
+    }
+  }
+
+  if (!row.systemAudit?.isSuspended && norm(row.status || "active") === "active") {
+    return {
+      label: "Eligible",
+      className:
+        "h-5 gap-1 border border-emerald-200 bg-emerald-50 px-1.5 py-0 text-[10px] font-medium text-emerald-700",
+    };
+  }
+
+  return {
+    label: "Not Eligible",
+    className:
+      "h-5 gap-1 border border-red-200 bg-red-50 px-1.5 py-0 text-[10px] font-medium text-red-700",
   };
 }
 
@@ -395,20 +508,19 @@ function buildPreviewRows(rows, faculty, existingInterns) {
   });
 }
 
-function buildInternPayload(row) {
-  const nameParts = splitFullName(row.fullName);
-
+function buildPreRegisteredInternPayload(row, ownerAcademic = {}) {
   return {
     student_id: row.studentId,
-    first_name: nameParts.firstName,
-    middle_name: nameParts.middleName,
-    last_name: nameParts.lastName,
-    gender: row.gender,
-    email: row.nuEmail,
+    full_name: row.fullName,
+    gender: row.gender || "",
     nu_email: row.nuEmail,
-    course: row.course,
+    course: row.course || ownerAcademic.course || "",
+    course_full_name: ownerAcademic.courseFullName || "",
+    school_program_code: ownerAcademic.schoolProgramCode || "",
+    school_program_full_name: ownerAcademic.schoolProgramFullName || "",
     role: "intern",
-    status: "active",
+    status: "pre-registered",
+    claimed: false,
   };
 }
 
@@ -420,7 +532,7 @@ function exportRowsToCsv(rows, fileName) {
     getPreferredNuEmail(row),
     row.course,
     row.gender,
-    row.systemAudit?.isSuspended ? "Suspended" : "Active",
+    getDisplayStatus(row),
   ]);
   const csv = [headers, ...body]
     .map((line) => line.map((value) => `"${safe(value).replace(/"/g, '""')}"`).join(","))
@@ -471,9 +583,10 @@ export default function ManageInterns() {
     if (!background) setLoading(true);
 
     try {
-      const [facultyData, internsData] = await Promise.all([
+      const [facultyData, internsData, preRegisteredData] = await Promise.all([
         apiRequest("/faculty/"),
         apiRequest("/interns/"),
+        apiRequest(PRE_REGISTERED_INTERNS_ENDPOINT),
       ]);
 
       const facultyList = normalizeListResponse(facultyData).map(normalizeFaculty);
@@ -488,9 +601,16 @@ export default function ManageInterns() {
       };
 
       const normalizedInterns = normalizeListResponse(internsData).map(normalizeIntern);
+      const normalizedPreRegisteredInterns = normalizeListResponse(preRegisteredData)
+        .map(normalizePreRegisteredIntern)
+        .filter((item) => !item.claimed && norm(item.status) !== "claimed");
 
       setOwnerAcademic(normalizedOwner);
-      setRows(normalizedInterns.filter((item) => academicMatchesOwner(item, normalizedOwner)));
+      setRows(
+        [...normalizedInterns, ...normalizedPreRegisteredInterns].filter((item) =>
+          academicMatchesOwner(item, normalizedOwner),
+        ),
+      );
     } catch (error) {
       setErr(error?.message || "Failed to load intern records.");
       setRows([]);
@@ -507,6 +627,10 @@ export default function ManageInterns() {
     const q = norm(search);
 
     return rows.filter((row) => {
+      if (sourceFilter === "registered" && (isPreRegisteredRow(row) || isTransitioningRow(row))) return false;
+      if (sourceFilter === "pre_registered" && (!isPreRegisteredRow(row) || isTransitioningRow(row))) return false;
+      if (sourceFilter === "transitioning" && !isTransitioningRow(row)) return false;
+
       const name = getInternName(row);
       const email = getPreferredNuEmail(row);
       const studentId = safe(row.studentId);
@@ -527,7 +651,7 @@ export default function ManageInterns() {
         .join(" | ")
         .includes(q);
     });
-  }, [rows, search, statusFilter, genderFilter, isReg]);
+  }, [rows, search, sourceFilter, statusFilter, genderFilter, isReg]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -554,15 +678,21 @@ export default function ManageInterns() {
     currentPageKeys.length > 0 && currentPageKeys.every((key) => selectedIds.includes(key));
   const someSelected = currentPageKeys.some((key) => selectedIds.includes(key)) && !allSelected;
 
+  const transitioningRows = rows.filter((row) => isTransitioningRow(row));
+  const registeredRows = rows.filter((row) => !isPreRegisteredRow(row) && !isTransitioningRow(row));
+  const preRegisteredRows = rows.filter((row) => isPreRegisteredRow(row) && !isTransitioningRow(row));
   const totalRecords = rows.length;
-  const activeCount = rows.filter((row) => !row.systemAudit?.isSuspended).length;
-  const suspendedCount = rows.filter((row) => !!row.systemAudit?.isSuspended).length;
+  const activeCount = registeredRows.filter((row) => !row.systemAudit?.isSuspended).length;
+  const suspendedCount = registeredRows.filter((row) => !!row.systemAudit?.isSuspended).length;
+  const preRegisteredCount = preRegisteredRows.length;
+  const transitioningCount = transitioningRows.length;
 
-  const hasActiveFilters = search !== "" || statusFilter !== "all" || genderFilter !== "all";
-  const activeFilterCount = [statusFilter !== "all", genderFilter !== "all"].filter(Boolean).length;
+  const hasActiveFilters = search !== "" || sourceFilter !== "registered" || statusFilter !== "all" || genderFilter !== "all";
+  const activeFilterCount = [sourceFilter !== "registered", statusFilter !== "all", genderFilter !== "all"].filter(Boolean).length;
 
   function resetAllFilters() {
     setSearch("");
+    setSourceFilter("registered");
     setStatusFilter("all");
     setGenderFilter("all");
   }
@@ -603,6 +733,77 @@ export default function ManageInterns() {
 
   async function expPdf() {
     toast.info("PDF export is not connected yet.");
+  }
+
+  async function handleDeleteIntern(row) {
+    if (!row?.id) return;
+
+    const name = getInternName(row);
+    const confirmed = window.confirm(
+      `Delete ${name}? This will permanently remove this intern record.`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await apiRequest(`${isPreRegisteredRow(row) ? PRE_REGISTERED_INTERNS_ENDPOINT : "/interns/"}${row.id}/`, {
+        method: "DELETE",
+      });
+
+      const key = gRK(row);
+      setRows((prev) => prev.filter((item) => gRK(item) !== key));
+      setSelectedIds((prev) => prev.filter((id) => id !== key));
+
+      toast.success("Intern record deleted", {
+        description: `${name} was removed successfully.`,
+      });
+    } catch (error) {
+      toast.error("Delete failed", {
+        description: error?.message || "Unable to delete this intern record.",
+      });
+    }
+  }
+
+  async function handleDeleteSelectedInterns() {
+    if (!selectedRows.length) return;
+
+    const confirmed = window.confirm(
+      `Delete ${selectedRows.length} selected ${selectedRows.length === 1 ? "record" : "records"}? This action cannot be undone.`,
+    );
+
+    if (!confirmed) return;
+
+    let deletedCount = 0;
+    let failedCount = 0;
+    const deletedKeys = [];
+
+    for (const row of selectedRows) {
+      try {
+        await apiRequest(`${isPreRegisteredRow(row) ? PRE_REGISTERED_INTERNS_ENDPOINT : "/interns/"}${row.id}/`, {
+          method: "DELETE",
+        });
+        deletedCount += 1;
+        deletedKeys.push(gRK(row));
+      } catch {
+        failedCount += 1;
+      }
+    }
+
+    if (deletedKeys.length > 0) {
+      const deletedKeySet = new Set(deletedKeys);
+      setRows((prev) => prev.filter((item) => !deletedKeySet.has(gRK(item))));
+      setSelectedIds((prev) => prev.filter((id) => !deletedKeySet.has(id)));
+    }
+
+    if (deletedCount > 0) {
+      toast.success("Selected records deleted", {
+        description: `${deletedCount} deleted${failedCount ? `, ${failedCount} failed` : ""}.`,
+      });
+    } else {
+      toast.error("Delete failed", {
+        description: "No selected records were deleted.",
+      });
+    }
   }
 
   async function handleBulkInternUpload(event) {
@@ -704,9 +905,9 @@ export default function ManageInterns() {
     try {
       for (const row of uploadableRows) {
         try {
-          await apiRequest("/interns/", {
+          await apiRequest(PRE_REGISTERED_INTERNS_ENDPOINT, {
             method: "POST",
-            body: JSON.stringify(buildInternPayload(row)),
+            body: JSON.stringify(buildPreRegisteredInternPayload(row, ownerAcademic)),
           });
           uploadedCount += 1;
         } catch {
@@ -743,7 +944,7 @@ export default function ManageInterns() {
       ) : null}
 
       {!loading ? (
-        <div className="grid gap-3 grid-cols-3">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-5">
           <div className="group rounded-xl border border-border bg-card px-5 py-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#3D398C]/20 hover:shadow-md">
             <div className="flex items-center gap-4">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#3D398C]/10">
@@ -773,6 +974,36 @@ export default function ManageInterns() {
                 <p className="text-xs font-semibold text-emerald-800">Active</p>
                 <p className="text-[10px] text-emerald-700/80">
                   Currently active interns
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 shadow-sm">
+            <div className="flex items-center gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100">
+                <Users className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-amber-700">{preRegisteredCount}</p>
+                <p className="text-xs font-semibold text-amber-800">Pre-Registered</p>
+                <p className="text-[10px] text-amber-700/80">
+                  Waiting for intern registration
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-orange-200 bg-orange-50 px-5 py-4 shadow-sm">
+            <div className="flex items-center gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-orange-100">
+                <RotateCcw className="h-5 w-5 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-orange-700">{transitioningCount}</p>
+                <p className="text-xs font-semibold text-orange-800">Transitioning</p>
+                <p className="text-[10px] text-orange-700/80">
+                  For alumni transition
                 </p>
               </div>
             </div>
@@ -859,8 +1090,11 @@ export default function ManageInterns() {
                 <SelectItem value="registered" className={selectItemCls}>
                   Registered
                 </SelectItem>
-                <SelectItem value="unregistered" className={selectItemCls}>
+                <SelectItem value="pre_registered" className={selectItemCls}>
                   Pre-Registered
+                </SelectItem>
+                <SelectItem value="transitioning" className={selectItemCls}>
+                  Transitioning
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -1047,9 +1281,19 @@ export default function ManageInterns() {
               {selectedCount} {selectedCount === 1 ? "record" : "records"} selected
             </span>
           </div>
-          <Button variant="outline" size="sm" className="h-7 gap-1.5 text-[11px] font-medium" onClick={clearSelection}>
-            <X className="h-3 w-3" /> Clear Selection
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 border-red-200 bg-white text-[11px] font-medium text-red-600 hover:bg-red-50 hover:text-red-700"
+              onClick={handleDeleteSelectedInterns}
+            >
+              <Trash2 className="h-3 w-3" /> Delete Selected
+            </Button>
+            <Button variant="outline" size="sm" className="h-7 gap-1.5 text-[11px] font-medium" onClick={clearSelection}>
+              <X className="h-3 w-3" /> Clear Selection
+            </Button>
+          </div>
         </div>
       ) : null}
 
@@ -1087,13 +1331,19 @@ export default function ManageInterns() {
                 <TableHead className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Status
                 </TableHead>
+                <TableHead className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Transition
+                </TableHead>
+                <TableHead className="w-[90px] px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
 
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-40 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="h-40 text-center text-muted-foreground">
                     <div className="flex flex-col items-center gap-3">
                       <div className="h-5 w-5 animate-spin rounded-full border-2 border-muted-foreground/20 border-t-[#3D398C]" />
                       <div className="space-y-1">
@@ -1105,7 +1355,7 @@ export default function ManageInterns() {
                 </TableRow>
               ) : paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-40 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="h-40 text-center text-muted-foreground">
                     <div className="flex flex-col items-center gap-2">
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
                         <Search className="h-5 w-5 text-muted-foreground/40" />
@@ -1114,7 +1364,7 @@ export default function ManageInterns() {
                       <p className="text-[11px] text-muted-foreground">
                         {hasActiveFilters
                           ? "No interns match your current search or filter criteria."
-                          : "No registered interns exist under your academic scope yet."}
+                          : "No records exist under your academic scope yet."}
                       </p>
                     </div>
                   </TableCell>
@@ -1125,6 +1375,7 @@ export default function ManageInterns() {
                   const name = getInternName(row);
                   const email = getPreferredNuEmail(row);
                   const isSuspended = !!row.systemAudit?.isSuspended;
+                  const eligibility = getTransitionEligibility(row);
 
                   return (
                     <TableRow
@@ -1170,7 +1421,15 @@ export default function ManageInterns() {
                       </TableCell>
 
                       <TableCell className="px-3 py-2">
-                        {isSuspended ? (
+                        {isTransitioningRow(row) ? (
+                          <Badge className="h-5 gap-1 border border-orange-200 bg-orange-50 px-1.5 py-0 text-[10px] font-medium text-orange-700">
+                            <RotateCcw className="h-3 w-3" /> Transitioning
+                          </Badge>
+                        ) : isPreRegisteredRow(row) ? (
+                          <Badge className="h-5 gap-1 border border-amber-200 bg-amber-50 px-1.5 py-0 text-[10px] font-medium text-amber-700">
+                            <Users className="h-3 w-3" /> Pre-Registered
+                          </Badge>
+                        ) : isSuspended ? (
                           <Badge variant="destructive" className="h-5 gap-1 px-1.5 py-0 text-[10px] font-medium">
                             <ShieldAlert className="h-3 w-3" /> Suspended
                           </Badge>
@@ -1179,6 +1438,25 @@ export default function ManageInterns() {
                             <ShieldCheck className="h-3 w-3" /> Active
                           </Badge>
                         )}
+                      </TableCell>
+
+                      <TableCell className="px-3 py-2">
+                        <Badge className={eligibility.className}>
+                          <UserCheck className="h-3 w-3" /> {eligibility.label}
+                        </Badge>
+                      </TableCell>
+
+                      <TableCell className="px-3 py-2 text-right" onClick={(event) => event.stopPropagation()}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-md text-red-500 hover:bg-red-50 hover:text-red-700"
+                          title="Delete intern"
+                          onClick={() => handleDeleteIntern(row)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );

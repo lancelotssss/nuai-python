@@ -11,6 +11,7 @@ import {
   Filter,
   SlidersHorizontal,
   GraduationCap,
+  Trash2,
   Loader2,
   RotateCcw,
   Search,
@@ -41,7 +42,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import {
   AlumniQuickViewModal,
@@ -111,6 +111,93 @@ function duplicateSetsFromRows(rows = []) {
   };
 }
 
+
+function normalizeRegisteredInternForTransition(row = {}) {
+  const firstName = safe(row.first_name || row.firstName);
+  const middleName = safe(row.middle_name || row.middleName);
+  const lastName = safe(row.last_name || row.lastName);
+  const fullName = [firstName, middleName, lastName].filter(Boolean).join(" ");
+
+  return {
+    id: row.id,
+    transitionSourceType: "registered_intern",
+    sourceType: "registered_intern",
+    studentId: row.student_id || row.studentId || "",
+    firstName,
+    middleName,
+    lastName,
+    fullName: fullName || row.full_name || row.fullName || row.name || "",
+    nuEmail: norm(row.email || row.nu_email || row.nuEmail),
+    personalEmail: "",
+    course: row.course || row.course_code || row.courseCode || "",
+    courseFullName: row.course_full_name || row.courseFullName || "",
+    schoolProgram: row.school_program || row.schoolProgram || "",
+    schoolProgramFullName: row.school_program_full_name || row.schoolProgramFullName || "",
+    status: row.status || "active",
+  };
+}
+
+function normalizePreRegisteredInternForTransition(row = {}) {
+  const fullName = row.full_name || row.fullName || row.name || "";
+  const nameParts = fullName
+    .split(/\s+/)
+    .map(safe)
+    .filter(Boolean);
+
+  return {
+    id: row.id,
+    transitionSourceType: "pre_registered_intern",
+    sourceType: "pre_registered_intern",
+    studentId: row.student_id || row.studentId || "",
+    firstName: nameParts[0] || "",
+    middleName: nameParts.length > 2 ? nameParts.slice(1, -1).join(" ") : "",
+    lastName: nameParts.length > 1 ? nameParts[nameParts.length - 1] : "",
+    fullName,
+    nuEmail: norm(row.nu_email || row.nuEmail || row.email),
+    personalEmail: "",
+    course: row.course || row.course_code || row.courseCode || "",
+    courseFullName: row.course_full_name || row.courseFullName || "",
+    schoolProgram: row.school_program_code || row.schoolProgramCode || row.school_program || row.schoolProgram || "",
+    schoolProgramFullName: row.school_program_full_name || row.schoolProgramFullName || "",
+    status: row.status || "pre-registered",
+    claimed: row.claimed === true,
+  };
+}
+
+function getTransitionCandidateKey(candidate = {}) {
+  return `${candidate.transitionSourceType || candidate.sourceType}-${candidate.id}`;
+}
+
+function findTransitionCandidate(row, registeredInterns = [], preRegisteredInterns = []) {
+  const rowStudentId = norm(row.studentId);
+  const rowEmail = norm(row.nuEmail);
+  const candidates = [...registeredInterns, ...preRegisteredInterns];
+
+  return candidates.find((candidate) => {
+    const candidateStudentId = norm(candidate.studentId);
+    const candidateEmail = norm(candidate.nuEmail);
+
+    return (
+      (rowStudentId && candidateStudentId && rowStudentId === candidateStudentId) ||
+      (rowEmail && candidateEmail && rowEmail === candidateEmail)
+    );
+  });
+}
+
+function isTransitionAllowedCandidate(candidate = {}) {
+  const status = norm(candidate.status).replace(/_/g, "-");
+
+  if (candidate.transitionSourceType === "registered_intern") {
+    return status === "active" || status === "registered";
+  }
+
+  if (candidate.transitionSourceType === "pre_registered_intern") {
+    return !candidate.claimed && (status === "pre-registered" || status === "preregistered");
+  }
+
+  return false;
+}
+
 export default function OfficerManageUsers() {
   const navigate = useNavigate();
   const preRegistrationUploadInputRef = useRef(null);
@@ -119,11 +206,14 @@ export default function OfficerManageUsers() {
   const [registeredRows, setRegisteredRows] = useState([]);
   const [preRegisteredRows, setPreRegisteredRows] = useState([]);
   const [transitionRows, setTransitionRows] = useState([]);
+  const [registeredInternRows, setRegisteredInternRows] = useState([]);
+  const [preRegisteredInternRows, setPreRegisteredInternRows] = useState([]);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [bulkUploading, setBulkUploading] = useState(false);
   const [err, setErr] = useState("");
   const [selected, setSelected] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState("registered");
@@ -157,10 +247,18 @@ export default function OfficerManageUsers() {
     setErr("");
 
     try {
-      const [alumniResult, preRegisteredResult, transitioningResult] = await Promise.allSettled([
+      const [
+        alumniResult,
+        preRegisteredResult,
+        transitioningResult,
+        internsResult,
+        preRegisteredInternsResult,
+      ] = await Promise.allSettled([
         apiRequest("/alumni/"),
         apiRequest("/pre-registered-alumni/"),
         apiRequest("/transitioning-alumni/"),
+        apiRequest("/interns/"),
+        apiRequest("/pre-registered-interns/"),
       ]);
 
       if (alumniResult.status === "rejected") {
@@ -176,10 +274,20 @@ export default function OfficerManageUsers() {
         transitioningResult.status === "fulfilled"
           ? normalizeListResponse(transitioningResult.value).map(normalizeTransitioningAlumni)
           : [];
+      const registeredInternList =
+        internsResult.status === "fulfilled"
+          ? normalizeListResponse(internsResult.value).map(normalizeRegisteredInternForTransition)
+          : [];
+      const preRegisteredInternList =
+        preRegisteredInternsResult.status === "fulfilled"
+          ? normalizeListResponse(preRegisteredInternsResult.value).map(normalizePreRegisteredInternForTransition)
+          : [];
 
       setRegisteredRows(registeredList);
       setPreRegisteredRows(preRegisteredList);
       setTransitionRows(transitioningList);
+      setRegisteredInternRows(registeredInternList);
+      setPreRegisteredInternRows(preRegisteredInternList);
 
       if (sourceFilter === "registered") setRows(registeredList);
       else if (sourceFilter === "transitioning") setRows(transitioningList);
@@ -200,9 +308,19 @@ export default function OfficerManageUsers() {
             "Registered alumni loaded, but /api/transitioning-alumni/ could not be reached.",
         });
       }
+
+      if (internsResult.status === "rejected" || preRegisteredInternsResult.status === "rejected") {
+        toast.warning("Intern transition source is incomplete", {
+          description:
+            "Transition upload validates against /api/interns/ and /api/pre-registered-interns/. Please check the backend if transition validation fails.",
+        });
+      }
     } catch (error) {
       setRegisteredRows([]);
       setPreRegisteredRows([]);
+      setTransitionRows([]);
+      setRegisteredInternRows([]);
+      setPreRegisteredInternRows([]);
       setRows([]);
       setErr(error?.message || "Failed to load alumni records.");
       toast.error("Failed to load alumni records", {
@@ -223,6 +341,7 @@ export default function OfficerManageUsers() {
     else setRows(preRegisteredRows);
 
     setSelected(null);
+    setSelectedIds([]);
     setCurrentPage(1);
   }, [sourceFilter, registeredRows, preRegisteredRows, transitionRows]);
 
@@ -269,6 +388,19 @@ export default function OfficerManageUsers() {
   const pageEnd = Math.min(pageStart + pageSize, filtered.length);
   const paginated = filtered.slice(pageStart, pageEnd);
 
+  const selectedRows = useMemo(() => {
+    const keys = new Set(selectedIds);
+    return rows.filter((row) => keys.has(makeKey(row)));
+  }, [rows, selectedIds]);
+
+  const selectedCount = selectedIds.length;
+  const currentPageKeys = paginated.map(makeKey);
+  const allSelected =
+    currentPageKeys.length > 0 &&
+    currentPageKeys.every((key) => selectedIds.includes(key));
+  const someSelected =
+    currentPageKeys.some((key) => selectedIds.includes(key)) && !allSelected;
+
   useEffect(() => {
     if (currentPage !== safePage) setCurrentPage(safePage);
   }, [currentPage, safePage]);
@@ -301,6 +433,133 @@ export default function OfficerManageUsers() {
     const id = row?.id;
     if (!id) return;
     navigate(`/alumni-officer/alumni/manage/${id}`);
+  }
+
+  function getDeleteEndpoint(row) {
+    if (!row?.id) return "";
+
+    if (row.sourceType === "unregistered") {
+      return `/pre-registered-alumni/${row.id}/`;
+    }
+
+    if (row.sourceType === "transitioning") {
+      return `/transitioning-alumni/${row.id}/`;
+    }
+
+    return `/alumni/${row.id}/`;
+  }
+
+  function removeRowsFromState(rowsToDelete = []) {
+    const keys = new Set(rowsToDelete.map(makeKey));
+
+    setRegisteredRows((prev) => prev.filter((row) => !keys.has(makeKey(row))));
+    setPreRegisteredRows((prev) => prev.filter((row) => !keys.has(makeKey(row))));
+    setTransitionRows((prev) => prev.filter((row) => !keys.has(makeKey(row))));
+    setRows((prev) => prev.filter((row) => !keys.has(makeKey(row))));
+    setSelectedIds((prev) => prev.filter((id) => !keys.has(id)));
+
+    if (selected && keys.has(makeKey(selected))) {
+      setSelected(null);
+    }
+  }
+
+  function toggleRowSelection(row) {
+    const key = makeKey(row);
+    setSelectedIds((prev) =>
+      prev.includes(key) ? prev.filter((id) => id !== key) : [...prev, key],
+    );
+  }
+
+  function toggleCurrentPageSelection() {
+    if (!currentPageKeys.length) return;
+
+    setSelectedIds((prev) => {
+      const allPageRowsSelected = currentPageKeys.every((key) => prev.includes(key));
+
+      if (allPageRowsSelected) {
+        return prev.filter((id) => !currentPageKeys.includes(id));
+      }
+
+      const next = new Set(prev);
+      currentPageKeys.forEach((key) => next.add(key));
+      return Array.from(next);
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds([]);
+  }
+
+  async function handleDeleteAlumni(row) {
+    if (!row?.id) return;
+
+    const name = getAlumniName(row);
+    const confirmed = window.confirm(
+      `Delete ${name}? This will permanently remove this ${
+        row.sourceType === "unregistered"
+          ? "pre-registered alumni record"
+          : row.sourceType === "transitioning"
+            ? "transitioning alumni record"
+            : "alumni record"
+      }.`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await apiRequest(getDeleteEndpoint(row), { method: "DELETE" });
+      removeRowsFromState([row]);
+
+      toast.success("Alumni record deleted", {
+        description: `${name} was removed successfully.`,
+      });
+    } catch (error) {
+      toast.error("Delete failed", {
+        description: error?.message || "Unable to delete this alumni record.",
+      });
+    }
+  }
+
+  async function handleDeleteSelectedAlumni() {
+    if (!selectedRows.length) return;
+
+    const confirmed = window.confirm(
+      `Delete ${selectedRows.length} selected ${
+        selectedRows.length === 1 ? "record" : "records"
+      }? This action cannot be undone.`,
+    );
+
+    if (!confirmed) return;
+
+    let deletedCount = 0;
+    let failedCount = 0;
+    const deletedRows = [];
+
+    for (const row of selectedRows) {
+      try {
+        await apiRequest(getDeleteEndpoint(row), { method: "DELETE" });
+        deletedRows.push(row);
+        deletedCount += 1;
+      } catch {
+        failedCount += 1;
+      }
+    }
+
+    if (deletedRows.length > 0) {
+      removeRowsFromState(deletedRows);
+    }
+
+    if (deletedCount > 0) {
+      toast.success("Selected records deleted", {
+        description: `${deletedCount} deleted${
+          failedCount ? `, ${failedCount} failed` : ""
+        }.`,
+      });
+    } else {
+      toast.error("Delete failed", {
+        description: "No selected records were deleted.",
+      });
+    }
   }
 
   function buildBulkRowStatus(parsedRows) {
@@ -345,6 +604,76 @@ export default function OfficerManageUsers() {
 
       return {
         ...row,
+        errors,
+        duplicateReasons,
+      };
+    });
+  }
+
+
+  function buildTransitionRowStatus(parsedRows) {
+    const fileDuplicateRowKeys = getFileDuplicateSummary(parsedRows);
+    const existingTransitioning = duplicateSetsFromRows(transitionRows);
+
+    return parsedRows.map((row) => {
+      const errors = [];
+      const duplicateReasons = [];
+      const rowStudentId = norm(row.studentId);
+      const rowEmail = norm(row.nuEmail);
+      const candidate = findTransitionCandidate(row, registeredInternRows, preRegisteredInternRows);
+
+      if (!safe(row.studentId)) {
+        errors.push("Missing Student ID");
+      }
+
+      if (fileDuplicateRowKeys.has(row._rowKey)) {
+        duplicateReasons.push("Duplicate inside uploaded file");
+      }
+
+      if (rowStudentId && existingTransitioning.studentIds.has(rowStudentId)) {
+        duplicateReasons.push("Student ID already exists in transitioning alumni");
+      }
+
+      if (rowEmail && existingTransitioning.emails.has(rowEmail)) {
+        duplicateReasons.push("NU Email already exists in transitioning alumni");
+      }
+
+      if (!candidate) {
+        errors.push("Student ID or NU Email was not found in registered/pre-registered interns");
+      } else if (!isTransitionAllowedCandidate(candidate)) {
+        const sourceLabel =
+          candidate.transitionSourceType === "registered_intern"
+            ? "registered intern"
+            : "pre-registered intern";
+        errors.push(`This ${sourceLabel} is not eligible for transition`);
+      }
+
+      if (!candidate) {
+        return {
+          ...row,
+          errors,
+          duplicateReasons,
+        };
+      }
+
+      return {
+        ...row,
+        sourceId: candidate.id,
+        sourceKey: getTransitionCandidateKey(candidate),
+        sourceType: candidate.transitionSourceType,
+        transitionSourceType: candidate.transitionSourceType,
+        firstName: candidate.firstName || row.firstName,
+        middleName: candidate.middleName || row.middleName,
+        lastName: candidate.lastName || row.lastName,
+        fullName: candidate.fullName || [row.firstName, row.middleName, row.lastName].filter(Boolean).join(" "),
+        nuEmail: candidate.nuEmail || row.nuEmail,
+        personalEmail: candidate.personalEmail || row.personalEmail,
+        course: candidate.course || row.courseGraduated,
+        courseGraduated: candidate.course || row.courseGraduated,
+        courseFullName: candidate.courseFullName || row.courseGraduatedFullName,
+        courseGraduatedFullName: candidate.courseFullName || row.courseGraduatedFullName,
+        schoolProgram: candidate.schoolProgram || row.schoolProgram,
+        schoolProgramFullName: candidate.schoolProgramFullName || row.schoolProgramFullName,
         errors,
         duplicateReasons,
       };
@@ -441,7 +770,7 @@ export default function OfficerManageUsers() {
         return;
       }
 
-      const rowsWithStatus = buildBulkRowStatus(parsedRows);
+      const rowsWithStatus = buildTransitionRowStatus(parsedRows);
       setBulkRows(rowsWithStatus);
       setBulkReviewOpen(true);
 
@@ -553,88 +882,83 @@ export default function OfficerManageUsers() {
     }
   }
 
-  const sourceLabel = isTransitioningSource
-    ? "Total Transitioning"
-    : isRegisteredSource
-      ? "Total Alumni"
-      : "Total Pre-Registered";
-
-  const sourceDescription = isTransitioningSource
-    ? "Intern accounts flagged for Alumni transition"
-    : isRegisteredSource
-      ? "All registered alumni in the Django system"
-      : "Pre-registered alumni records";
-
   const selectTriggerCls =
-    "h-8 w-full rounded-md border-border bg-background text-xs shadow-none focus:ring-1 focus:ring-[#3D398C]/25";
-  const selectItemCls =
-    "cursor-pointer items-start whitespace-normal break-words py-2 pr-8 text-xs leading-snug *:[span]:last:whitespace-normal *:[span]:last:break-words *:[span]:last:leading-snug";
+    "h-9 w-full bg-background border border-input rounded-md shadow-sm text-sm transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20";
+  const selectItemCls = "cursor-pointer";
   const selectContentCls =
-    "z-[80] w-[320px] max-w-[calc(100vw-2rem)] min-w-[var(--radix-select-trigger-width)] overflow-hidden border border-border bg-popover text-popover-foreground shadow-xl [&_[data-radix-select-viewport]]:max-h-[14rem] [&_[data-radix-select-viewport]]:overflow-y-auto [&_[data-radix-select-viewport]]:pr-1";
+    "z-[80] w-[var(--radix-select-trigger-width)] min-w-[var(--radix-select-trigger-width)] overflow-hidden [&_[data-radix-select-viewport]]:max-h-[11rem] [&_[data-radix-select-viewport]]:overflow-y-auto [&_[data-radix-select-viewport]]:pr-1";
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-2 animate-fadeIn">
       {err ? (
-        <div className="animate-in fade-in-50 slide-in-from-top-1 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-sm text-destructive duration-200">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-sm text-destructive">
           {err}
         </div>
       ) : null}
 
       {!loading ? (
-        <div className={`grid gap-3 ${isRegisteredSource ? "md:grid-cols-3" : "max-w-xs grid-cols-1"}`}>
-          <div className="group cursor-default rounded-xl border border-border bg-card px-5 py-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#3D398C]/20 hover:shadow-md">
+        <div className="grid gap-3 md:grid-cols-4">
+          <div className="group rounded-xl border border-border bg-card px-5 py-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#3D398C]/20 hover:shadow-md">
             <div className="flex items-center gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#3D398C]/10 transition-colors duration-200 group-hover:bg-[#3D398C]/15">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#3D398C]/10">
                 <Users className="h-5 w-5" style={{ color: BB }} />
               </div>
-              <div className="space-y-0.5">
-                <p className="text-xl font-bold leading-tight tracking-tight" style={{ color: BB }}>
-                  {totalRecords}
+              <div>
+                <p className="text-xl font-bold" style={{ color: BB }}>
+                  {registeredRows.length}
                 </p>
-                <p className="text-xs font-semibold text-foreground/80">{sourceLabel}</p>
-                <p className="text-[10px] text-muted-foreground">{sourceDescription}</p>
+                <p className="text-xs font-semibold text-foreground/80">Registered Alumni</p>
+                <p className="text-[10px] text-muted-foreground">Active database records</p>
               </div>
             </div>
           </div>
 
-          {isRegisteredSource ? (
-            <>
-              <div className="group cursor-default rounded-xl border border-border bg-card px-5 py-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 transition-colors duration-200 group-hover:bg-emerald-100">
-                    <UserCheck className="h-5 w-5 text-emerald-600" />
-                  </div>
-                  <div className="space-y-0.5">
-                    <p className="text-xl font-bold leading-tight tracking-tight text-emerald-700">{activeCount}</p>
-                    <p className="text-xs font-semibold text-foreground/80">Active</p>
-                    <p className="text-[10px] text-muted-foreground">Currently active alumni accounts</p>
-                  </div>
-                </div>
+          <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 shadow-sm">
+            <div className="flex items-center gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100">
+                <FileSpreadsheet className="h-5 w-5 text-blue-600" />
               </div>
+              <div>
+                <p className="text-xl font-bold text-blue-700">{preRegisteredCount}</p>
+                <p className="text-xs font-semibold text-blue-800">Pre-Registered</p>
+                <p className="text-[10px] text-blue-700/80">Bulk uploaded records</p>
+              </div>
+            </div>
+          </div>
 
-              <div className="group cursor-default rounded-xl border border-border bg-card px-5 py-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-red-200 hover:shadow-md">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50 transition-colors duration-200 group-hover:bg-red-100">
-                    <UserX className="h-5 w-5 text-red-500" />
-                  </div>
-                  <div className="space-y-0.5">
-                    <p className="text-xl font-bold leading-tight tracking-tight text-red-600">{inactiveCount}</p>
-                    <p className="text-xs font-semibold text-foreground/80">Deactivated</p>
-                    <p className="text-[10px] text-muted-foreground">Inactive alumni accounts</p>
-                  </div>
-                </div>
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 shadow-sm">
+            <div className="flex items-center gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100">
+                <UserCheck className="h-5 w-5 text-emerald-600" />
               </div>
-            </>
-          ) : null}
+              <div>
+                <p className="text-xl font-bold text-emerald-700">{activeCount}</p>
+                <p className="text-xs font-semibold text-emerald-800">Active</p>
+                <p className="text-[10px] text-emerald-700/80">Active alumni accounts</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 shadow-sm">
+            <div className="flex items-center gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100">
+                <UserX className="h-5 w-5 text-red-500" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-red-600">{inactiveCount}</p>
+                <p className="text-xs font-semibold text-red-800">Deactivated</p>
+                <p className="text-[10px] text-red-700/80">Inactive alumni accounts</p>
+              </div>
+            </div>
+          </div>
         </div>
       ) : null}
 
-      <div className="space-y-3">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold tracking-tight text-foreground">Alumni Records</h2>
-            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
-              Manage registered, pre-registered, and transitioning alumni records.
-            </p>
+      <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+        <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-foreground/80">Filters</p>
+            <p className="text-[11px] text-muted-foreground">Narrow alumni records by source, status, course, or search text.</p>
           </div>
 
           {hasActiveFilters ? (
@@ -644,14 +968,14 @@ export default function OfficerManageUsers() {
           ) : null}
         </div>
 
-        <div className="flex flex-col gap-3">
-          <div className="max-w-sm min-w-[240px] flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="max-w-sm min-w-[200px] flex-1">
             <Label className="mb-1 block text-[11px] font-medium text-muted-foreground">Search</Label>
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search by name, email, student ID, course, or year..."
-                className="h-8 rounded-md border-border bg-background pl-8 pr-8 text-xs shadow-none focus-visible:ring-1 focus-visible:ring-[#3D398C]/25"
+                className="h-9 bg-background pl-8 pr-8 text-sm"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
@@ -668,40 +992,34 @@ export default function OfficerManageUsers() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-end gap-2.5 border-b border-border/60 pb-3">
-          <div>
+        <div className="flex flex-wrap items-end gap-2.5">
+          <div className="max-w-[180px] min-w-[140px] flex-1">
             <Label className="mb-1 block text-[11px] font-medium text-muted-foreground">Source</Label>
-            <Tabs value={sourceFilter} onValueChange={setSourceFilter}>
-              <TabsList className="h-auto min-h-8 flex-wrap rounded-md bg-muted p-1 group-data-horizontal/tabs:h-auto">
-                <TabsTrigger value="registered" className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white">
-                  Registered
-                </TabsTrigger>
-                <TabsTrigger value="unregistered" className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white">
-                  Pre-Registered
-                </TabsTrigger>
-                <TabsTrigger value="transitioning" className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white">
-                  Transitioning
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <Select value={sourceFilter} onValueChange={setSourceFilter}>
+              <SelectTrigger className={selectTriggerCls}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper" side="bottom" align="start" sideOffset={0} avoidCollisions={false} className={selectContentCls}>
+                <SelectItem value="registered" className={selectItemCls}>Registered</SelectItem>
+                <SelectItem value="unregistered" className={selectItemCls}>Pre-Registered</SelectItem>
+                <SelectItem value="transitioning" className={selectItemCls}>Transitioning</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {isRegisteredSource ? (
-            <div>
+            <div className="max-w-[170px] min-w-[130px] flex-1">
               <Label className="mb-1 block text-[11px] font-medium text-muted-foreground">Status</Label>
-              <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-                <TabsList className="h-auto min-h-8 flex-wrap rounded-md bg-muted p-1 group-data-horizontal/tabs:h-auto">
-                  <TabsTrigger value="all" className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white">
-                    All Status
-                  </TabsTrigger>
-                  <TabsTrigger value="active" className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white">
-                    Active
-                  </TabsTrigger>
-                  <TabsTrigger value="deactivated" className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white">
-                    Deactivated
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className={selectTriggerCls}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper" side="bottom" align="start" sideOffset={0} avoidCollisions={false} className={selectContentCls}>
+                  <SelectItem value="all" className={selectItemCls}>All Status</SelectItem>
+                  <SelectItem value="active" className={selectItemCls}>Active</SelectItem>
+                  <SelectItem value="deactivated" className={selectItemCls}>Deactivated</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           ) : null}
 
@@ -709,7 +1027,7 @@ export default function OfficerManageUsers() {
             <Label className="mb-1 block text-[11px] font-medium text-muted-foreground">Course</Label>
             <Select value={courseFilter} onValueChange={setCourseFilter}>
               <SelectTrigger className={selectTriggerCls}>
-                <SelectValue placeholder="All Courses" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent position="popper" side="bottom" align="start" sideOffset={0} avoidCollisions={false} className={selectContentCls}>
                 <SelectItem value="all" className={selectItemCls}>All Courses</SelectItem>
@@ -735,60 +1053,143 @@ export default function OfficerManageUsers() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-xs font-semibold text-foreground">Bulk Upload & Export</p>
-          <p className="text-[11px] text-muted-foreground">
-            Upload transition or pre-registration spreadsheets, open Advanced Export, or refresh records.
-          </p>
-        </div>
+      <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-foreground/80">Bulk Upload & Export</p>
+            <p className="text-[11px] text-muted-foreground">Bulk upload transition or pre-registration spreadsheets, open Advanced Export, or refresh records.</p>
+          </div>
 
-        <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
-          <input ref={transitionUploadInputRef} type="file" accept={BULK_UPLOAD_ACCEPT} className="hidden" onChange={handleTransitionUpload} />
-          <input ref={preRegistrationUploadInputRef} type="file" accept={BULK_UPLOAD_ACCEPT} className="hidden" onChange={handleBulkAlumniUpload} />
+          <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
+            <input
+              ref={transitionUploadInputRef}
+              type="file"
+              accept={BULK_UPLOAD_ACCEPT}
+              className="hidden"
+              onChange={handleTransitionUpload}
+            />
 
-          <Button type="button" variant="outline" size="sm" disabled={bulkUploading} className="h-9 gap-1.5 font-medium" onClick={() => transitionUploadInputRef.current?.click()} title="Bulk upload alumni transition records from CSV or Excel">
-            {bulkUploading && bulkMode === "transition" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-            Transition
-            <Badge variant="secondary" className="ml-1 hidden h-4 px-1.5 py-0 text-[10px] sm:inline-flex">CSV/XLSX</Badge>
-          </Button>
+            <input
+              ref={preRegistrationUploadInputRef}
+              type="file"
+              accept={BULK_UPLOAD_ACCEPT}
+              className="hidden"
+              onChange={handleBulkAlumniUpload}
+            />
 
-          <Button type="button" variant="outline" size="sm" disabled={bulkUploading} className="h-9 gap-1.5 font-medium" onClick={() => preRegistrationUploadInputRef.current?.click()} title="Bulk upload Alumni pre-registration records from CSV or Excel">
-            {bulkUploading && bulkMode === "pre-registration" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
-            Pre-Registration
-            <Badge variant="secondary" className="ml-1 hidden h-4 px-1.5 py-0 text-[10px] sm:inline-flex">CSV/XLSX</Badge>
-          </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={bulkUploading}
+              className="h-9 gap-1.5 font-medium"
+              onClick={() => transitionUploadInputRef.current?.click()}
+              title="Bulk upload alumni transition records from CSV or Excel"
+            >
+              {bulkUploading && bulkMode === "transition" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+              Transition
+              <Badge variant="secondary" className="ml-1 hidden h-4 px-1.5 py-0 text-[10px] sm:inline-flex">CSV/XLSX</Badge>
+            </Button>
 
-          <Button type="button" variant="outline" size="sm" className="h-9 gap-1.5 font-medium" onClick={() => navigate("/alumni-officer/alumni/manage/advanced")} title="Open Advanced Export">
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            Advanced Export
-          </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={bulkUploading}
+              className="h-9 gap-1.5 font-medium"
+              onClick={() => preRegistrationUploadInputRef.current?.click()}
+              title="Bulk upload Alumni pre-registration records from CSV or Excel"
+            >
+              {bulkUploading && bulkMode === "pre-registration" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
+              Pre-Registration
+              <Badge variant="secondary" className="ml-1 hidden h-4 px-1.5 py-0 text-[10px] sm:inline-flex">CSV/XLSX</Badge>
+            </Button>
 
-          <Button variant="outline" size="sm" className="h-9 gap-1.5 font-medium" disabled={loading} onClick={loadRows}>
-            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
-            Refresh
-          </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5 font-medium"
+              onClick={() => navigate("/alumni-officer/alumni/manage/advanced")}
+              title="Open Advanced Export"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              Advanced Export
+            </Button>
+
+            <Button variant="outline" size="sm" className="h-9 gap-1.5 font-medium" disabled={loading} onClick={loadRows}>
+              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+              Refresh
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="overflow-hidden border-t border-border/60">
+      {selectedCount > 0 ? (
+        <div className="flex items-center justify-between rounded-lg border border-[#3D398C]/20 bg-[#3D398C]/5 px-4 py-2">
+          <div className="flex items-center gap-2">
+            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#3D398C]/10">
+              <Users className="h-3 w-3" style={{ color: BB }} />
+            </div>
+            <span className="text-xs font-medium" style={{ color: BB }}>
+              {selectedCount} {selectedCount === 1 ? "record" : "records"} selected
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 border-red-200 bg-white text-[11px] font-medium text-red-600 hover:bg-red-50 hover:text-red-700"
+              onClick={handleDeleteSelectedAlumni}
+            >
+              <Trash2 className="h-3 w-3" />
+              Delete Selected
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 text-[11px] font-medium"
+              onClick={clearSelection}
+            >
+              <X className="h-3 w-3" />
+              Clear Selection
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="border-b border-border/50 bg-transparent hover:bg-transparent">
-                <TableHead className="min-w-[260px] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Alumni</TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Student ID</TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Program</TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Graduation</TableHead>
-                <TableHead className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Status</TableHead>
-                <TableHead className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Actions</TableHead>
+              <TableRow className="border-b border-border bg-muted/40 hover:bg-transparent">
+                <TableHead className="w-10 px-3 py-2">
+                  <input
+                    type="checkbox"
+                    checked={allSelected || someSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = someSelected;
+                    }}
+                    onChange={toggleCurrentPageSelection}
+                    className="h-3.5 w-3.5 cursor-pointer rounded border-gray-300 accent-[#3D398C]"
+                  />
+                </TableHead>
+                <TableHead className="min-w-[190px] px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Name</TableHead>
+                <TableHead className="min-w-[200px] px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">NU Email</TableHead>
+                <TableHead className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Student ID</TableHead>
+                <TableHead className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Course</TableHead>
+                <TableHead className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Graduation</TableHead>
+                <TableHead className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Status</TableHead>
+                <TableHead className="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Action</TableHead>
               </TableRow>
             </TableHeader>
 
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-40 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-40 text-center text-muted-foreground">
                     <div className="flex flex-col items-center gap-3">
                       <div className="h-5 w-5 animate-spin rounded-full border-2 border-muted-foreground/20 border-t-[#3D398C]" />
                       <div className="space-y-1">
@@ -800,7 +1201,7 @@ export default function OfficerManageUsers() {
                 </TableRow>
               ) : paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-40 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-40 text-center text-muted-foreground">
                     <div className="flex flex-col items-center gap-2">
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
                         <Search className="h-5 w-5 text-muted-foreground/40" />
@@ -828,18 +1229,38 @@ export default function OfficerManageUsers() {
                   const isTransitioning = row.sourceType === "transitioning";
 
                   return (
-                    <TableRow key={makeKey(row)} className="cursor-pointer border-b border-border/60 transition-colors duration-150 hover:bg-muted/30" onClick={() => setSelected(row)}>
-                      <TableCell className="px-3 py-2.5">
-                        <span className="block max-w-[260px] truncate text-xs font-semibold text-foreground">{getAlumniName(row)}</span>
-                        <span className="block max-w-[260px] truncate text-[11px] text-muted-foreground">{row.email || "—"}</span>
+                    <TableRow
+                      key={makeKey(row)}
+                      className={`cursor-pointer transition-colors duration-150 ${
+                        selectedIds.includes(makeKey(row))
+                          ? "bg-[#3D398C]/5 hover:bg-[#3D398C]/10"
+                          : "hover:bg-muted/40"
+                      }`}
+                      onClick={() => setSelected(row)}
+                    >
+                      <TableCell className="px-3 py-2" onClick={(event) => event.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(makeKey(row))}
+                          onChange={() => toggleRowSelection(row)}
+                          className="h-3.5 w-3.5 cursor-pointer rounded border-gray-300 accent-[#3D398C]"
+                        />
                       </TableCell>
-                      <TableCell className="px-3 py-2.5 text-xs tabular-nums text-muted-foreground">{row.studentId || "—"}</TableCell>
-                      <TableCell className="px-3 py-2.5">
-                        <span className="block max-w-[180px] truncate text-xs font-semibold text-foreground">{row.course || "—"}</span>
-                        <span className="block max-w-[180px] truncate text-[10px] font-medium text-muted-foreground">{row.courseFullName || "—"}</span>
+                      <TableCell className="px-3 py-2">
+                        <span className="block max-w-[220px] truncate text-[13px] font-semibold text-foreground">{getAlumniName(row)}</span>
                       </TableCell>
-                      <TableCell className="px-3 py-2.5 text-xs tabular-nums text-muted-foreground">{row.graduationYear || "—"}</TableCell>
-                      <TableCell className="px-3 py-2.5">
+                      <TableCell className="px-3 py-2">
+                        <span className="block max-w-[230px] truncate text-xs text-muted-foreground">{row.email || "—"}</span>
+                      </TableCell>
+                      <TableCell className="px-3 py-2 text-xs tabular-nums text-muted-foreground">{row.studentId || "—"}</TableCell>
+                      <TableCell className="px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="block max-w-[160px] truncate text-xs font-semibold text-foreground">{row.course || "—"}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-3 py-2 text-xs text-muted-foreground">{row.graduationYear || "—"}</TableCell>
+                      <TableCell className="px-3 py-2">
                         <Badge
                           variant="outline"
                           className={
@@ -848,18 +1269,37 @@ export default function OfficerManageUsers() {
                               : isPreRegistered
                                 ? "h-5 gap-1 border-blue-200 bg-blue-50 px-1.5 py-0 text-[10px] font-medium text-blue-700"
                                 : isActive
-                                  ? "h-5 gap-1 border-emerald-200 bg-emerald-50 px-1.5 py-0 text-[10px] font-medium text-emerald-700"
-                                  : "h-5 gap-1 border-red-200 bg-red-50 px-1.5 py-0 text-[10px] font-medium text-red-700"
+                                ? "h-5 gap-1 border-emerald-200 bg-emerald-50 px-1.5 py-0 text-[10px] font-medium text-emerald-700"
+                                : "h-5 gap-1 border-red-200 bg-red-50 px-1.5 py-0 text-[10px] font-medium text-red-700"
                           }
                         >
                           <ShieldCheck className="h-3 w-3" />
                           {displayStatus(row.status)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="px-3 py-2.5 text-right" onClick={(event) => event.stopPropagation()}>
-                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-muted hover:text-[#3D398C]" onClick={() => openFullProfile(row)} title={isPreRegistered ? "View pre-registered alumni" : "View alumni profile"}>
-                          <Eye className="h-3.5 w-3.5" />
-                        </Button>
+                      <TableCell className="px-3 py-2 text-right" onClick={(event) => event.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-[#3D398C]"
+                            onClick={() => openFullProfile(row)}
+                            title={isPreRegistered ? "View pre-registered alumni" : "View alumni profile"}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-md text-red-500 hover:bg-red-50 hover:text-red-700"
+                            onClick={() => handleDeleteAlumni(row)}
+                            title="Delete alumni record"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -909,7 +1349,12 @@ export default function OfficerManageUsers() {
         </div>
       </div>
 
-      <AlumniQuickViewModal user={selected} open={!!selected} onClose={() => setSelected(null)} onViewProfile={() => openFullProfile(selected)} />
+      <AlumniQuickViewModal
+        user={selected}
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        onViewProfile={() => openFullProfile(selected)}
+      />
 
       <BulkUploadReviewModal
         open={bulkReviewOpen}
@@ -925,7 +1370,11 @@ export default function OfficerManageUsers() {
         onContinue={handleBulkReviewContinue}
       />
 
-      <BulkUploadSummaryModal open={bulkSummary.open} summary={bulkSummary} onClose={() => setBulkSummary((prev) => ({ ...prev, open: false }))} />
+      <BulkUploadSummaryModal
+        open={bulkSummary.open}
+        summary={bulkSummary}
+        onClose={() => setBulkSummary((prev) => ({ ...prev, open: false }))}
+      />
     </div>
   );
 }

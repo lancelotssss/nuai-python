@@ -34,6 +34,9 @@ import IndividualClassManagement from "./pages/faculty-admin/internship-manageme
 import ManageInterns from "./pages/faculty-admin/program-course-students/ManageInterns";
 
 import AlumniDashboardPage from "./pages/alumni-intern/AlumniDashboardPage";
+import InternRegisterPage from "./pages/alumni-intern/intern/InternRegisterPage";
+import AlumniLayout from "./pages/alumni-intern/layout/AlumniLayout";
+import AlumniNewsFeed from "./pages/alumni-intern/components/AlumniNewsFeed";
 
 import OfficerLayout from "./pages/alumni-officer/layout/OfficerLayout";
 import OfficerDashboardPage from "./pages/alumni-officer/dashboard/OfficerDashboardPage";
@@ -79,24 +82,61 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/intern/register" element={<InternRegisterPage />} />
 
         <Route path="/super-admin" element={<Navigate to="/admin" replace />} />
 
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboardPage />} />
           <Route path="logs" element={<AdminSystemLogs />} />
-          <Route path="manage-administrators" element={<ManageAdministratorsPage />} />
-          <Route path="manage-administrators/alumni-affairs-officer" element={<ManageAlumniAffairsOfficerPage />} />
-          <Route path="manage-administrators/alumni-affairs-officer/create" element={<AdminCreateAlumniOfficer />} />
-          <Route path="manage-administrators/ailpo" element={<ManageAilpoPage />} />
-          <Route path="manage-administrators/ailpo/create" element={<AdminCreateAILPO />} />
-          <Route path="manage-administrators/registrar" element={<ManageRegistrarPage />} />
-          <Route path="manage-administrators/registrar/create" element={<AdminCreateRegistrar />} />
-          <Route path="manage-administrators/faculty" element={<ManageFacultyPage />} />
-          <Route path="manage-administrators/faculty/create" element={<AdminCreateFaculty />} />
-          <Route path="academic-records" element={<AdminManageAcademicRecordsPage />} />
-          <Route path="academic-records/:schoolProgramId" element={<AcademicProgramTableView />} />
-          <Route path="organization-chart" element={<AdminOrganizationalChart />} />
+          <Route
+            path="manage-administrators"
+            element={<ManageAdministratorsPage />}
+          />
+          <Route
+            path="manage-administrators/alumni-affairs-officer"
+            element={<ManageAlumniAffairsOfficerPage />}
+          />
+          <Route
+            path="manage-administrators/alumni-affairs-officer/create"
+            element={<AdminCreateAlumniOfficer />}
+          />
+          <Route
+            path="manage-administrators/ailpo"
+            element={<ManageAilpoPage />}
+          />
+          <Route
+            path="manage-administrators/ailpo/create"
+            element={<AdminCreateAILPO />}
+          />
+          <Route
+            path="manage-administrators/registrar"
+            element={<ManageRegistrarPage />}
+          />
+          <Route
+            path="manage-administrators/registrar/create"
+            element={<AdminCreateRegistrar />}
+          />
+          <Route
+            path="manage-administrators/faculty"
+            element={<ManageFacultyPage />}
+          />
+          <Route
+            path="manage-administrators/faculty/create"
+            element={<AdminCreateFaculty />}
+          />
+          <Route
+            path="academic-records"
+            element={<AdminManageAcademicRecordsPage />}
+          />
+          <Route
+            path="academic-records/:schoolProgramId"
+            element={<AcademicProgramTableView />}
+          />
+          <Route
+            path="organization-chart"
+            element={<AdminOrganizationalChart />}
+          />
           <Route path="profile" element={<AdminProfile />} />
         </Route>
 
@@ -105,7 +145,10 @@ export default function App() {
           <Route path="internships" element={<ClassManagement />} />
           <Route path="internships/add-class" element={<AddClass />} />
           <Route path="intern-list" element={<ManageInterns />} />
-          <Route path="internships/:classId" element={<IndividualClassManagement />} />
+          <Route
+            path="internships/:classId"
+            element={<IndividualClassManagement />}
+          />
           <Route path="profile" element={<FacultyProfile />} />
           <Route path="system-audit" element={<FacultySystemAudit />} />
         </Route>
@@ -114,31 +157,71 @@ export default function App() {
           <Route index element={<OfficerDashboardPage />} />
           <Route path="profile" element={<OfficerProfile />} />
           <Route path="system-audit" element={<OfficerSystemAudit />} />
+
           <Route path="alumni/manage" element={<OfficerManageUsers />} />
-          <Route path="alumni/manage/advanced" element={<OfficerAdvancedExport />} />
-          <Route path="alumni/manage/analytics" element={<OfficerEmploymentAnalytics />} />
+          <Route
+            path="alumni/manage/advanced"
+            element={<OfficerAdvancedExport />}
+          />
+          <Route
+            path="alumni/manage/analytics"
+            element={<OfficerEmploymentAnalytics />}
+          />
           <Route path="alumni/manage/:userId" element={<OfficerViewProfile />} />
 
           <Route path="posts" element={<OfficerPost />} />
           <Route path="posts/create" element={<OfficerCreatePost />} />
           <Route path="posts/edit/:postId" element={<OfficerEditPost />} />
 
-          <Route path="perks-discounts" element={<OfficerManagePerksDiscounts />} />
-          <Route path="perks-discounts/create" element={<OfficerCreatePerksDiscounts />} />
-          <Route path="perks-discounts/edit/:perkId" element={<OfficerEditPerksDiscounts />} />
-          <Route path="perks-discounts/view/:perkId" element={<OfficerPreviewPerksDiscounts />} />
+          <Route
+            path="perks-discounts"
+            element={<OfficerManagePerksDiscounts />}
+          />
+          <Route
+            path="perks-discounts/create"
+            element={<OfficerCreatePerksDiscounts />}
+          />
+          <Route
+            path="perks-discounts/edit/:perkId"
+            element={<OfficerEditPerksDiscounts />}
+          />
+          <Route
+            path="perks-discounts/view/:perkId"
+            element={<OfficerPreviewPerksDiscounts />}
+          />
 
           <Route path="calendar" element={<OfficerManageCalendar />} />
-          <Route path="calendar/create" element={<OfficerEventFormPage mode="create" />} />
-          <Route path="calendar/edit/:eventId" element={<OfficerEventFormPage mode="edit" />} />
+          <Route
+            path="calendar/create"
+            element={<OfficerEventFormPage mode="create" />}
+          />
+          <Route
+            path="calendar/edit/:eventId"
+            element={<OfficerEventFormPage mode="edit" />}
+          />
         </Route>
 
+        {/* Alumni / Intern gate entry */}
         <Route path="/alumni" element={<AlumniDashboardPage />} />
         <Route path="/intern" element={<AlumniDashboardPage />} />
 
-        <Route path="/ailpo" element={<DashboardPlaceholder title="AILPO Dashboard" />} />
-        <Route path="/registrar" element={<DashboardPlaceholder title="Registrar Dashboard" />} />
-        <Route path="/partner" element={<DashboardPlaceholder title="Partner Dashboard" />} />
+        {/* Alumni / Intern original portal layout */}
+        <Route element={<AlumniLayout />}>
+          <Route path="/news" element={<AlumniNewsFeed />} />
+        </Route>
+
+        <Route
+          path="/ailpo"
+          element={<DashboardPlaceholder title="AILPO Dashboard" />}
+        />
+        <Route
+          path="/registrar"
+          element={<DashboardPlaceholder title="Registrar Dashboard" />}
+        />
+        <Route
+          path="/partner"
+          element={<DashboardPlaceholder title="Partner Dashboard" />}
+        />
       </Routes>
     </BrowserRouter>
   );

@@ -531,10 +531,12 @@ export default function OfficerCalendarForm({
   async function uploadCoverImage(file, targetId = "") {
     if (!(file instanceof File)) return form.coverImageUrl || "";
 
-    const safeName = file.name.replace(/\s+/g, "-");
+    const fileName = String(file.name || "cover-image");
+    const extensionMatch = fileName.match(/\.[a-zA-Z0-9]+$/);
+    const extension = extensionMatch ? extensionMatch[0].toLowerCase() : ".jpg";
     const path = targetId
-      ? `calendarEvents/${targetId}/${Date.now()}-${safeName}`
-      : `calendarEvents/temp/${Date.now()}-${safeName}`;
+      ? `calendarEvents/${targetId}/cover-image${extension}`
+      : `calendarEvents/temp/cover-image-${Date.now()}${extension}`;
 
     const storageRef = ref(storage, path);
     await uploadBytes(storageRef, file);

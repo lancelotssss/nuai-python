@@ -121,6 +121,26 @@ const CATEGORY_CHART_COLORS = [
   "#CBD5E1",
 ];
 
+
+/* Chart configs for local chart wrapper */
+const monthlyChartConfig = {
+  count: {
+    label: "Records",
+    color: BRAND_BLUE,
+  },
+};
+
+const categoryChartConfig = {
+  count: {
+    label: "Records",
+    color: BRAND_BLUE,
+  },
+};
+
+const donutChartConfig = {
+  value: { label: "Count" },
+};
+
 const MONTH_OPTIONS = [
   { value: "0", label: "Jan" },
   { value: "1", label: "Feb" },
@@ -192,6 +212,23 @@ function formatPercent(value) {
   return `${numeric.toFixed(numeric % 1 === 0 ? 0 : 1)}%`;
 }
 
+function getValue(source = {}, ...keys) {
+  for (const key of keys) {
+    if (!key) continue;
+
+    if (key.includes(".")) {
+      const value = key.split(".").reduce((acc, part) => acc?.[part], source);
+      if (value !== undefined && value !== null && safeText(value) !== "") return value;
+      continue;
+    }
+
+    const value = source?.[key];
+    if (value !== undefined && value !== null && safeText(value) !== "") return value;
+  }
+
+  return "";
+}
+
 function normalizeStatus(value) {
   return safeText(value).toLowerCase();
 }
@@ -206,9 +243,9 @@ function isAvailableSurvey(survey = {}) {
 }
 
 function isVisibleEvent(event = {}) {
-  const status = normalizeStatus(event?.status || "active");
+  const status = normalizeStatus(getValue(event, "status", "eventStatus", "event_status") || "active");
 
-  if (status === "draft" || status === "archived" || status === "cancelled") {
+  if (status === "draft" || status === "archived" || status === "cancelled" || status === "canceled") {
     return false;
   }
 
@@ -216,12 +253,12 @@ function isVisibleEvent(event = {}) {
 }
 
 function isVisiblePost(post = {}) {
-  const status = normalizeStatus(post?.status || post?.postStatus || "active");
+  const status = normalizeStatus(getValue(post, "status", "postStatus", "post_status") || "active");
   return status !== "draft" && status !== "archived" && status !== "deleted";
 }
 
 function isVisiblePerk(perk = {}) {
-  const status = normalizeStatus(perk?.status || perk?.perkStatus || "active");
+  const status = normalizeStatus(getValue(perk, "status", "perkStatus", "perk_status") || "active");
   return status !== "draft" && status !== "archived" && status !== "deleted";
 }
 
@@ -235,57 +272,84 @@ function getSurveyTitle(survey = {}) {
 }
 
 function getEventTitle(event = {}) {
-  return safeText(event?.title || event?.eventTitle || event?.name) || "Untitled Event";
+  return (
+    safeText(getValue(event, "title", "eventTitle", "event_title", "name")) ||
+    "Untitled Event"
+  );
 }
 
 function getPostTitle(post = {}) {
-  const title =
-    safeText(post?.postHeader) ||
-    safeText(post?.title) ||
-    safeText(post?.postTitle) ||
-    safeText(post?.newsTitle) ||
-    safeText(post?.announcementTitle) ||
-    safeText(post?.headline) ||
-    safeText(post?.caption) ||
-    safeText(post?.subject) ||
-    safeText(post?.postDetails?.title) ||
-    safeText(post?.postContent?.title) ||
-    safeText(post?.content?.title) ||
-    safeText(post?.details?.title) ||
-    safeText(post?.body?.title);
+  const title = safeText(
+    getValue(
+      post,
+      "postHeader",
+      "post_header",
+      "title",
+      "postTitle",
+      "post_title",
+      "newsTitle",
+      "news_title",
+      "announcementTitle",
+      "announcement_title",
+      "headline",
+      "caption",
+      "subject",
+      "postDetails.title",
+      "post_details.title",
+      "postContent.title",
+      "post_content.title",
+      "content.title",
+      "details.title",
+      "body.title",
+    ),
+  );
 
   if (title) return title;
 
-  const body =
-    safeText(post?.postContent) ||
-    safeText(post?.description) ||
-    safeText(post?.content) ||
-    safeText(post?.body) ||
-    safeText(post?.message) ||
-    safeText(post?.postText) ||
-    safeText(post?.postContent?.body) ||
-    safeText(post?.postDetails?.description) ||
-    safeText(post?.details?.description);
+  const body = safeText(
+    getValue(
+      post,
+      "postContent",
+      "post_content",
+      "description",
+      "content",
+      "body",
+      "message",
+      "postText",
+      "post_text",
+      "postContent.body",
+      "post_content.body",
+      "postDetails.description",
+      "post_details.description",
+      "details.description",
+    ),
+  );
 
   return body ? `${body.slice(0, 55)}${body.length > 55 ? "..." : ""}` : "Untitled Post";
 }
 
 function getPerkTitle(perk = {}) {
-  const title =
-    safeText(perk?.postHeader) ||
-    safeText(perk?.title) ||
-    safeText(perk?.perkTitle) ||
-    safeText(perk?.discountTitle) ||
-    safeText(perk?.name) ||
-    safeText(perk?.companyName);
+  const title = safeText(
+    getValue(
+      perk,
+      "postHeader",
+      "post_header",
+      "title",
+      "perkTitle",
+      "perk_title",
+      "discountTitle",
+      "discount_title",
+      "name",
+      "companyName",
+      "company_name",
+    ),
+  );
 
   if (title) return title;
 
-  const body =
-    safeText(perk?.postContent) ||
-    safeText(perk?.description) ||
-    safeText(perk?.content) ||
-    safeText(perk?.details);
+  const body = safeText(
+    getValue(perk, "postContent", "post_content", "description", "content", "details"),
+  );
 
   return body ? `${body.slice(0, 55)}${body.length > 55 ? "..." : ""}` : "Untitled Perk";
 }
@@ -304,32 +368,19 @@ function normalizeCategoryLabel(value, fallback = "Uncategorized") {
 
 function getPostCategory(post = {}) {
   return normalizeCategoryLabel(
-    post?.category ||
-      post?.postCategory ||
-      post?.postType ||
-      post?.type ||
-      post?.contentType,
+    getValue(post, "category", "postCategory", "post_category", "postType", "post_type", "type", "contentType", "content_type"),
   );
 }
 
 function getEventCategory(event = {}) {
   return normalizeCategoryLabel(
-    event?.category ||
-      event?.eventCategory ||
-      event?.eventType ||
-      event?.type ||
-      event?.activityType,
+    getValue(event, "category", "eventCategory", "event_category", "eventType", "event_type", "type", "activityType", "activity_type"),
   );
 }
 
 function getPerkCategory(perk = {}) {
   return normalizeCategoryLabel(
-    perk?.category ||
-      perk?.perkCategory ||
-      perk?.discountCategory ||
-      perk?.perkType ||
-      perk?.type ||
-      perk?.offerType,
+    getValue(perk, "category", "perkCategory", "perk_category", "discountCategory", "discount_category", "perkType", "perk_type", "type", "offerType", "offer_type"),
   );
 }
 
@@ -366,12 +417,19 @@ function parseDateSafe(value) {
 
 function getCreatedDate(data = {}) {
   return (
-    parseDateSafe(data?.createdAt) ||
-    parseDateSafe(data?.publishedAt) ||
-    parseDateSafe(data?.updatedAt) ||
-    parseDateSafe(data?.systemAudit?.createdAt) ||
-    parseDateSafe(data?.systemAudit?.updatedAt) ||
+    parseDateSafe(getValue(data, "createdAt", "created_at")) ||
+    parseDateSafe(getValue(data, "publishedAt", "published_at")) ||
+    parseDateSafe(getValue(data, "updatedAt", "updated_at")) ||
+    parseDateSafe(getValue(data, "systemAudit.createdAt", "system_audit.created_at")) ||
+    parseDateSafe(getValue(data, "systemAudit.updatedAt", "system_audit.updated_at")) ||
     null
+  );
+}
+
+function getEventDate(event = {}) {
+  return (
+    parseDateSafe(getValue(event, "eventDate", "event_date", "startDate", "start_date", "date")) ||
+    getCreatedDate(event)
   );
 }
 
@@ -884,7 +942,7 @@ function MonthlyPostingActivityCard({
           <SelectTrigger className="h-8 w-[160px] cursor-pointer rounded-md border-gray-200 bg-white text-xs">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="z-[100] border border-gray-200 bg-white text-gray-900 shadow-lg">
             {POSTING_ACTIVITY_TYPES.map((t) => (
               <SelectItem key={t.value} value={t.value} className="cursor-pointer">
                 {t.label}
@@ -897,7 +955,7 @@ function MonthlyPostingActivityCard({
           <SelectTrigger className="h-8 w-[100px] cursor-pointer rounded-md border-gray-200 bg-white text-xs">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="z-[100] border border-gray-200 bg-white text-gray-900 shadow-lg">
             {yearOptions.map((y) => (
               <SelectItem key={y} value={String(y)} className="cursor-pointer">
                 {y}
@@ -1024,7 +1082,7 @@ function MostPostedCategoryCard({
           <SelectTrigger className="h-8 w-[160px] cursor-pointer rounded-md border-gray-200 bg-white text-xs">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="z-[100] border border-gray-200 bg-white text-gray-900 shadow-lg">
             {POSTING_CATEGORY_TYPES.map((t) => (
               <SelectItem key={t.value} value={t.value} className="cursor-pointer">
                 {t.label}
@@ -1037,7 +1095,7 @@ function MostPostedCategoryCard({
           <SelectTrigger className="h-8 w-[100px] cursor-pointer rounded-md border-gray-200 bg-white text-xs">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="z-[100] border border-gray-200 bg-white text-gray-900 shadow-lg">
             {yearOptions.map((y) => (
               <SelectItem key={y} value={String(y)} className="cursor-pointer">
                 {y}
@@ -1140,7 +1198,7 @@ function MiniCalendarCard({ events, onViewAll }) {
     return events
       .map((event) => ({
         ...event,
-        parsedDate: parseDateSafe(event?.eventDate || event?.startDate || event?.date),
+        parsedDate: getEventDate(event),
       }))
       .filter((event) => event.parsedDate)
       .sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime());
@@ -1487,7 +1545,7 @@ function RecentActivityCard({
     return events
       .map((event) => ({
         ...event,
-        parsedDate: parseDateSafe(event?.eventDate || event?.startDate || event?.date),
+        parsedDate: getEventDate(event),
       }))
       .filter((event) => event.parsedDate)
       .sort((a, b) => b.parsedDate.getTime() - a.parsedDate.getTime());
@@ -1565,7 +1623,7 @@ function RecentActivityCard({
               emptyText="No recent posts"
               getTitle={getPostTitle}
               getMeta={getPostCategory}
-              getDate={(post) => post.createdAt || post.publishedAt || post.updatedAt}
+              getDate={(post) => getCreatedDate(post)}
               onItemClick={onViewPosts}
             />
           </TabsContent>
@@ -1589,7 +1647,7 @@ function RecentActivityCard({
               emptyText="No recent perks"
               getTitle={getPerkTitle}
               getMeta={getPerkCategory}
-              getDate={(perk) => perk.createdAt || perk.publishedAt || perk.updatedAt}
+              getDate={(perk) => getCreatedDate(perk)}
               onItemClick={onViewPerks}
             />
           </TabsContent>
@@ -1662,15 +1720,13 @@ function AlumniRegistrationCard({ counts = DASHBOARD_COUNTS_INITIAL, loading = f
   );
 }
 
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 
-// These modules are not present yet in the current Django backend.
-// Keeping them disabled prevents repeated 404 requests while preserving the original UI sections.
+// Survey APIs are not part of the current Django conversion yet.
+// Keep survey calls disabled to avoid repeated 404s, but allow Posts, Perks, and Events.
 const DISABLED_OPTIONAL_DASHBOARD_ENDPOINT_PREFIXES = [
-  "/posts/",
   "/surveys/",
-  "/perks-discounts/",
-  "/calendar-events/",
+  "/survey-responses/",
 ];
 
 function shouldSkipDashboardEndpoint(endpoint = "") {
@@ -1824,8 +1880,8 @@ async function loadAvailableSurveys() {
 async function loadCalendarEvents() {
   const events = await fetchFirstList(["/calendar-events/"]);
   return events.filter(isVisibleEvent).sort((a, b) => {
-    const aDate = parseDateSafe(a?.eventDate || a?.startDate || a?.date || a?.createdAt);
-    const bDate = parseDateSafe(b?.eventDate || b?.startDate || b?.date || b?.createdAt);
+    const aDate = getEventDate(a);
+    const bDate = getEventDate(b);
     return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
   });
 }
@@ -1875,10 +1931,7 @@ async function loadMonthlyPostingActivity({
     if (type === "events" && !isVisibleEvent(data)) return;
     if (type === "surveys" && !isAvailableSurvey(data)) return;
 
-    const date =
-      type === "events"
-        ? parseDateSafe(data?.eventDate || data?.startDate || data?.date || data?.createdAt)
-        : getCreatedDate(data);
+    const date = type === "events" ? getEventDate(data) : getCreatedDate(data);
 
     if (!date || date.getFullYear() !== targetYear) return;
 
@@ -1911,10 +1964,7 @@ async function loadMostPostedCategory({
     if (type === "perks" && !isVisiblePerk(data)) return;
     if (type === "events" && !isVisibleEvent(data)) return;
 
-    const date =
-      type === "events"
-        ? parseDateSafe(data?.eventDate || data?.startDate || data?.date || data?.createdAt)
-        : getCreatedDate(data);
+    const date = type === "events" ? getEventDate(data) : getCreatedDate(data);
 
     if (!date || date.getFullYear() !== targetYear) return;
 

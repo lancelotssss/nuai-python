@@ -247,6 +247,24 @@ export function ref(_storage, path) {
   return { path };
 }
 
+function uploadBucketForPath(path = "") {
+  const root = String(path || "").split("/")[0];
+
+  if (root === "newsPosts" || root === "posts") {
+    return "officer-posts";
+  }
+
+  if (root === "perksDiscounts" || root === "perks-discounts") {
+    return "officer-perks-discounts";
+  }
+
+  if (root === "calendarEvents" || root === "calendar-events") {
+    return "officer-calendar-events";
+  }
+
+  return root || "officer-posts";
+}
+
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     if (!file) return resolve("");
@@ -258,6 +276,39 @@ function fileToDataUrl(file) {
 }
 
 export async function uploadBytes(fileRef, file) {
+  if (!file) return { ref: fileRef };
+
+  const formData = new FormData();
+  const uploadPath = fileRef.path || "uploads/file";
+  const collectionName = String(uploadPath).split("/")[0] || "posts";
+
+  formData.append("file", file);
+  formData.append("path", uploadPath);
+  formData.append("bucket", uploadBucketForPath(uploadPath));
+  formData.append("collectionName", collectionName);
+
+  try {
+    const response = await fetch(`${API_BASE}/uploads/`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(text || `Upload failed with status ${response.status}`);
+    }
+
+    const payload = await response.json();
+    const publicUrl = payload?.publicUrl || payload?.public_url || payload?.url || "";
+
+    if (publicUrl) {
+      memoryUploads.set(fileRef.path, publicUrl);
+      return { ref: fileRef, metadata: payload };
+    }
+  } catch (error) {
+    console.error("Supabase upload failed; using local preview fallback:", error);
+  }
+
   const dataUrl = await fileToDataUrl(file);
   memoryUploads.set(fileRef.path, dataUrl);
   return { ref: fileRef };

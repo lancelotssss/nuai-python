@@ -45,7 +45,6 @@ import {
   splitRequirements,
   MAX_IMAGE_COUNT,
   MAX_IMAGE_SIZE,
-  safeFileName,
 } from "./perk-utils/perkFormUtils";
 
 import PerksStepCompany from "./perk-components/PerksStepCompany";
@@ -58,6 +57,17 @@ import PerksSidebarNotes from "./perk-components/PerksSidebarNotes";
 import PerksStepPosting from "./perk-components/PerksStepPosting";
 
 const STEP_COUNT = 7;
+
+
+function getUploadExtension(file) {
+  const name = String(file?.name || "");
+  const match = name.match(/\.[a-zA-Z0-9]+$/);
+  return match ? match[0].toLowerCase() : ".jpg";
+}
+
+function buildPerkImagePath(perkId, index, file) {
+  return `perksDiscounts/${perkId}/perk-image-${index + 1}${getUploadExtension(file)}`;
+}
 
 function getLocalTodayString() {
   const now = new Date();
@@ -931,20 +941,19 @@ export default function OfficerPerksDiscountForm({
 
     const uploadedURLs = [];
 
-    for (const file of files) {
-      const safeName = `${Date.now()}_${safeFileName(file.name)}`;
-      const path = `perksDiscounts/${finalId}/${safeName}`;
+    for (const [index, file] of files.entries()) {
+      const path = buildPerkImagePath(finalId, index, file);
 
       const fileRef = ref(storage, path);
       await uploadBytes(fileRef, file);
 
       const url = await getDownloadURL(fileRef);
-      uploadedURLs.push(url);
+      if (url) uploadedURLs.push(url);
     }
 
     if (uploadedURLs.length > 0 || isEditMode) {
       await updateDoc(finalRef, {
-        photoURLs: [...existingImageUrls, ...uploadedURLs],
+        photoURLs: uploadedURLs.length > 0 ? uploadedURLs : existingImageUrls,
         updatedAt: serverTimestamp(),
       });
     }

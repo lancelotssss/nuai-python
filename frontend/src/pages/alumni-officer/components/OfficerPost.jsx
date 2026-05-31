@@ -1005,13 +1005,13 @@ export default function OfficerPost({
                   <TabsList className="inline-flex h-8 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
                     <TabsTrigger
                       value="active"
-                      className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white"
+                      className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-active:!bg-[#3D398C] data-active:!text-white data-[state=active]:!bg-[#3D398C] data-[state=active]:!text-white"
                     >
                       Active
                     </TabsTrigger>
                     <TabsTrigger
                       value="inactive"
-                      className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white"
+                      className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-active:!bg-[#3D398C] data-active:!text-white data-[state=active]:!bg-[#3D398C] data-[state=active]:!text-white"
                     >
                       Inactive
                     </TabsTrigger>
@@ -1055,7 +1055,7 @@ export default function OfficerPost({
                   <SelectTrigger className="h-8 w-[160px] rounded-md border-border bg-background text-xs shadow-none">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[100] border border-gray-200 bg-white text-gray-900 shadow-lg">
                     <SelectItem value="all">All Posts</SelectItem>
                     <SelectItem value="with_images">With Images</SelectItem>
                     <SelectItem value="with_links">With Links</SelectItem>
@@ -1073,7 +1073,7 @@ export default function OfficerPost({
                   <SelectTrigger className="h-8 w-[130px] rounded-md border-border bg-background text-xs shadow-none">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[100] border border-gray-200 bg-white text-gray-900 shadow-lg">
                     <SelectItem value="recent">Newest</SelectItem>
                     <SelectItem value="oldest">Oldest</SelectItem>
                   </SelectContent>
@@ -1089,31 +1089,31 @@ export default function OfficerPost({
                   <TabsList className="inline-flex h-8 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
                     <TabsTrigger
                       value="all"
-                      className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white"
+                      className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-active:!bg-[#3D398C] data-active:!text-white data-[state=active]:!bg-[#3D398C] data-[state=active]:!text-white"
                     >
                       All
                     </TabsTrigger>
                     <TabsTrigger
                       value="open"
-                      className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white"
+                      className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-active:!bg-[#3D398C] data-active:!text-white data-[state=active]:!bg-[#3D398C] data-[state=active]:!text-white"
                     >
                       Open
                     </TabsTrigger>
                     <TabsTrigger
                       value="draft"
-                      className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white"
+                      className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-active:!bg-[#3D398C] data-active:!text-white data-[state=active]:!bg-[#3D398C] data-[state=active]:!text-white"
                     >
                       Draft
                     </TabsTrigger>
                     <TabsTrigger
                       value="closed"
-                      className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white"
+                      className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-active:!bg-[#3D398C] data-active:!text-white data-[state=active]:!bg-[#3D398C] data-[state=active]:!text-white"
                     >
                       Closed
                     </TabsTrigger>
                     <TabsTrigger
                       value="archived"
-                      className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-[state=active]:bg-[#3D398C] data-[state=active]:text-white"
+                      className="h-6 rounded-sm px-3 text-[11px] font-medium transition-colors data-active:!bg-[#3D398C] data-active:!text-white data-[state=active]:!bg-[#3D398C] data-[state=active]:!text-white"
                     >
                       Archive
                     </TabsTrigger>
@@ -1429,7 +1429,7 @@ export default function OfficerPost({
                   <SelectTrigger className="h-7 w-[62px] text-[11px] bg-background border-input">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent align="end">
+                  <SelectContent align="end" className="z-[100] border border-gray-200 bg-white text-gray-900 shadow-lg">
                     {PS_OPTIONS.map((n) => (
                       <SelectItem
                         key={n}

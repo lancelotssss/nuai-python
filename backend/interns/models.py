@@ -4,6 +4,8 @@ from django.db import models
 class Intern(models.Model):
     STATUS_CHOICES = [
         ("active", "Active"),
+        ("transitioning", "Transitioning"),
+        ("transitioned", "Transitioned"),
         ("deactivated", "Deactivated"),
     ]
 
@@ -20,6 +22,7 @@ class Intern(models.Model):
     year_level = models.CharField(max_length=50, blank=True, null=True)
 
     contact_number = models.CharField(max_length=30, blank=True, null=True)
+    personal_email = models.EmailField(max_length=150, blank=True, null=True)
     email = models.EmailField(max_length=150, blank=True, null=True)
 
     role = models.CharField(max_length=30, choices=ROLE_CHOICES, default="intern")

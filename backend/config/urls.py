@@ -18,4 +18,10 @@ urlpatterns = [
     path("api/", include("organization_chart.urls")),
     path("api/", include("internship_classes.urls")),
     path("api/", include("pre_registered_alumni.urls")),
+    path("api/", include("transitioning_alumni.urls")),
+    path("api/", include("officer_posts.urls")),
+    path("api/", include("officer_perks_discounts.urls")),
+    path("api/", include("officer_calendar_events.urls")),
+    path("api/uploads/", include("supabase_storage.urls")),
+    path("api/", include("pre_registered_interns.urls")),
 ]

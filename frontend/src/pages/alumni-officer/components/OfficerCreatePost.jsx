@@ -47,6 +47,16 @@ const STEP_COUNT = 4;
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 const MAX_IMAGE_COUNT = 5;
 
+function getUploadExtension(file) {
+  const name = String(file?.name || "");
+  const match = name.match(/\.[a-zA-Z0-9]+$/);
+  return match ? match[0].toLowerCase() : ".jpg";
+}
+
+function buildPostImagePath(postId, index, file) {
+  return `newsPosts/${postId}/post-image-${index + 1}${getUploadExtension(file)}`;
+}
+
 function buildNameWithMiddleInitial(personalInfo = {}) {
   const first = String(personalInfo.firstName || "").trim();
   const middle = String(personalInfo.middleName || "").trim();
@@ -1144,15 +1154,14 @@ export default function OfficerDashboardCreatePost({ onDone, onCancel }) {
 
       const uploadedURLs = [];
 
-      for (const file of files) {
-        const safeName = `${Date.now()}-${file.name}`;
-        const path = `newsPosts/${docRef.id}/${safeName}`;
+      for (const [index, file] of files.entries()) {
+        const path = buildPostImagePath(docRef.id, index, file);
 
         const fileRef = ref(storage, path);
         await uploadBytes(fileRef, file);
 
         const url = await getDownloadURL(fileRef);
-        uploadedURLs.push(url);
+        if (url) uploadedURLs.push(url);
       }
 
       if (uploadedURLs.length > 0) {
@@ -1201,15 +1210,14 @@ export default function OfficerDashboardCreatePost({ onDone, onCancel }) {
 
       const uploadedURLs = [];
 
-      for (const file of files) {
-        const safeName = `${Date.now()}-${file.name}`;
-        const path = `newsPosts/${docRef.id}/${safeName}`;
+      for (const [index, file] of files.entries()) {
+        const path = buildPostImagePath(docRef.id, index, file);
 
         const fileRef = ref(storage, path);
         await uploadBytes(fileRef, file);
 
         const url = await getDownloadURL(fileRef);
-        uploadedURLs.push(url);
+        if (url) uploadedURLs.push(url);
       }
 
       if (uploadedURLs.length > 0) {

@@ -173,7 +173,7 @@ export default function PerksStepContent({
               <SelectValue placeholder="Select a category" />
             </SelectTrigger>
 
-            <SelectContent>
+            <SelectContent className="z-[100] border border-gray-200 bg-white text-gray-900 shadow-lg">
               {CATEGORY_OPTIONS.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}

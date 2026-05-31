@@ -523,7 +523,27 @@ export function buildPreRegisteredAlumniPayload(row) {
 
 export function buildTransitioningAlumniPayload(row) {
   return {
-    ...buildPreRegisteredAlumniPayload(row),
+    source_type: safe(row.transitionSourceType || row.sourceType),
+    source_id: row.sourceId || row.source_id || row.selectedIntern?.id || null,
+
+    student_id: formatStudentIdInput(row.studentId),
+    first_name: capitalizePerWord(row.firstName),
+    middle_name: capitalizePerWord(row.middleName),
+    last_name: capitalizePerWord(row.lastName),
+    nu_email: norm(row.nuEmail),
+    personal_email: norm(row.personalEmail),
+
+    course_graduated: safe(row.courseGraduated || row.course),
+    course_graduated_full_name: safe(row.courseGraduatedFullName || row.courseFullName),
+    school_program: safe(row.schoolProgram || row.schoolProgramCode),
+    school_program_full_name: safe(row.schoolProgramFullName),
+
+    graduation_period: safe(row.graduationPeriod) || "For Transition",
+    year_graduated: safe(row.yearGraduated || row.graduationPeriod),
+    academic_award: safe(row.academicAward),
+    loyalty: safe(row.loyalty),
+
+    role: "alumni",
     status: "transitioning",
     transition_status: "pending",
   };

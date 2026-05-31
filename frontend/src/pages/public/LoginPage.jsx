@@ -98,6 +98,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [transitionPrompt, setTransitionPrompt] = useState(null);
+  const [transitionLoading, setTransitionLoading] = useState(false);
 
   const [failedCount, setFailedCount] = useState(0);
   const [lockUntil, setLockUntil] = useState(0);
@@ -196,6 +199,7 @@ export default function LoginPage() {
   async function handleLogin(e) {
     e.preventDefault();
     setErr("");
+    setNotice("");
 
     if (isLocked) {
       setErr(`Too many failed attempts. Try again in ${secondsLeft}s.`);
@@ -229,7 +233,21 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        if (data.requires_requirement_gate && data.account) {
+          clearLockState();
+          localStorage.setItem("nuai_account", JSON.stringify(data.account));
+          navigate(data.redirect_to || "/intern", { replace: true });
+          return;
+        }
+
         registerFailedAttempt(data.message || "Invalid email or password");
+        return;
+      }
+
+      if (data.requires_transition_confirmation && data.account) {
+        clearLockState();
+        localStorage.setItem("nuai_account", JSON.stringify(data.account));
+        navigate(data.redirect_to || "/intern", { replace: true });
         return;
       }
 
@@ -252,6 +270,46 @@ export default function LoginPage() {
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleConfirmTransition() {
+    if (!transitionPrompt?.email || !transitionPrompt?.password) return;
+
+    setTransitionLoading(true);
+    setErr("");
+    setNotice("");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/accounts/confirm-intern-transition/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: transitionPrompt.email,
+          password: transitionPrompt.password,
+          personal_email: transitionPrompt.transition?.personal_email,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setErr(data.message || "Unable to complete alumni transition.");
+        return;
+      }
+
+      localStorage.removeItem("nuai_account");
+      setTransitionPrompt(null);
+      setForm({ email: data.login_email || transitionPrompt.transition?.personal_email || "", password: "" });
+      setTouched({ email: false, password: false });
+      setNotice(data.message || "Transition completed. Please log in using your personal email.");
+      navigate("/login", { replace: true });
+    } catch {
+      setErr("Unable to connect to the server. Please check if Django is running.");
+    } finally {
+      setTransitionLoading(false);
     }
   }
 
@@ -559,6 +617,17 @@ export default function LoginPage() {
                         </div>
                       </div>
 
+                      <div
+                        className={[
+                          "overflow-hidden transition-all duration-200 ease-out",
+                          notice ? "max-h-28 opacity-100" : "max-h-0 opacity-0",
+                        ].join(" ")}
+                      >
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-700">
+                          {notice}
+                        </div>
+                      </div>
+
                       <Button
                         type="submit"
                         disabled={submitDisabled}
@@ -779,6 +848,57 @@ export default function LoginPage() {
           </div>
         </div>
       </main>
+
+      {transitionPrompt ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="bg-nu-blue px-6 py-5 text-white">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10">
+                  <ShieldCheck className="h-5 w-5 text-nu-gold" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold">Confirm Alumni Transition</h3>
+                  <p className="text-xs text-white/75">Your intern account is ready to become an alumni account.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 px-6 py-5">
+              <div className="rounded-2xl border border-nu-blue/10 bg-nu-blue/[0.03] px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-nu-blue/70">Personal Email</p>
+                <p className="mt-1 break-all text-sm font-bold text-nu-blue">
+                  {transitionPrompt.transition?.personal_email || "No personal email found"}
+                </p>
+              </div>
+
+              <p className="text-sm leading-6 text-slate-600">
+                Please confirm that this is the personal email you will use moving forward. After confirmation, you will be signed out and must log in again using this personal email.
+              </p>
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={transitionLoading}
+                  onClick={() => setTransitionPrompt(null)}
+                  className="border-nu-blue/20 text-nu-blue hover:bg-nu-blue/5"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  disabled={transitionLoading || !transitionPrompt.transition?.personal_email}
+                  onClick={handleConfirmTransition}
+                  className="bg-nu-blue text-white hover:bg-nu-blue/90"
+                >
+                  {transitionLoading ? "Confirming..." : "Confirm and Transition"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <Footer logoSrc={FooterLogo} />
     </>
